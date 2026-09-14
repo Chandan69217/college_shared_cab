@@ -1,0 +1,35 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authRoutes_1 = __importDefault(require("./authRoutes"));
+const studentRoutes_1 = __importDefault(require("./studentRoutes"));
+const driverRoutes_1 = __importDefault(require("./driverRoutes"));
+const adminRoutes_1 = __importDefault(require("./adminRoutes"));
+const catalogRoutes_1 = __importDefault(require("./catalogRoutes"));
+const planRoutes_1 = __importDefault(require("./planRoutes"));
+const bookingRoutes_1 = __importDefault(require("./bookingRoutes"));
+const qrRoutes_1 = __importDefault(require("./qrRoutes"));
+const tripRoutes_1 = __importDefault(require("./tripRoutes"));
+const paymentRoutes_1 = __importDefault(require("./paymentRoutes"));
+const complaintRoutes_1 = __importDefault(require("./complaintRoutes"));
+const reportRoutes_1 = __importDefault(require("./reportRoutes"));
+const holidayRoutes_1 = __importDefault(require("./holidayRoutes"));
+const router = (0, express_1.Router)();
+router.use('/auth', authRoutes_1.default);
+router.use('/students', studentRoutes_1.default);
+router.use('/drivers', driverRoutes_1.default);
+router.use('/admin', adminRoutes_1.default);
+router.use('/catalog', catalogRoutes_1.default);
+router.use('/plans', planRoutes_1.default);
+router.use('/bookings', bookingRoutes_1.default);
+router.use('/qr', qrRoutes_1.default);
+router.use('/trips', tripRoutes_1.default);
+router.use('/payments', paymentRoutes_1.default);
+router.use('/complaints', complaintRoutes_1.default);
+router.use('/reports', reportRoutes_1.default);
+router.use('/holidays', holidayRoutes_1.default);
+exports.default = router;
+//# sourceMappingURL=index.js.map

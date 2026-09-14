@@ -1,0 +1,20 @@
+export declare const ENV: {
+    PORT: number;
+    NODE_ENV: string;
+    API_PREFIX: string;
+    CORS_ORIGIN: string;
+    JWT_SECRET: string;
+    JWT_EXPIRES_IN: string;
+    QR_HMAC_SECRET: string;
+    DATABASE_URL: string;
+    SUPABASE_URL: string;
+    SUPABASE_ANON_KEY: string;
+    SUPABASE_SERVICE_ROLE_KEY: string;
+    PAYMENT_GATEWAY_PROVIDER: string;
+    RAZORPAY_KEY_ID: string;
+    RAZORPAY_KEY_SECRET: string;
+    PAYMENT_WEBHOOK_SECRET: string;
+    MAPS_API_KEY: string;
+    FCM_SERVER_KEY: string;
+    DEFAULT_SERVICE_RADIUS_KM: number;
+};

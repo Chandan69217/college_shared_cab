@@ -1,0 +1,19 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const studentController_1 = require("../controllers/studentController");
+const auth_1 = require("../middleware/auth");
+const rbac_1 = require("../middleware/rbac");
+const auditLog_1 = require("../middleware/auditLog");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticateJwt);
+router.use((0, rbac_1.requireRole)(['STUDENT']));
+router.get('/dashboard', studentController_1.StudentController.getDashboard);
+router.post('/verification', (0, auditLog_1.auditLog)('SUBMIT_VERIFICATION', 'student_profiles'), studentController_1.StudentController.submitVerification);
+router.get('/subscriptions', studentController_1.StudentController.getSubscriptions);
+router.get('/bookings', studentController_1.StudentController.getBookings);
+router.get('/passes', studentController_1.StudentController.getPasses);
+router.get('/payments', studentController_1.StudentController.getPayments);
+router.post('/sos', (0, auditLog_1.auditLog)('TRIGGER_SOS', 'emergency_alert'), studentController_1.StudentController.triggerSos);
+exports.default = router;
+//# sourceMappingURL=studentRoutes.js.map
