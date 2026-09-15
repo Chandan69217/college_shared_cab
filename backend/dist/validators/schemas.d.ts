@@ -1,10 +1,11 @@
 import { z } from 'zod';
-export declare const registerStudentSchema: z.ZodObject<{
+export declare const registerStudentSchema: z.ZodEffects<z.ZodObject<{
     email: z.ZodString;
     phone: z.ZodString;
     full_name: z.ZodString;
     password: z.ZodString;
-    college_id: z.ZodString;
+    college_id: z.ZodOptional<z.ZodString>;
+    college_code: z.ZodOptional<z.ZodString>;
     student_id_number: z.ZodString;
     roll_number: z.ZodOptional<z.ZodString>;
     course: z.ZodString;
@@ -14,24 +15,50 @@ export declare const registerStudentSchema: z.ZodObject<{
     email: string;
     phone: string;
     full_name: string;
-    password: string;
-    college_id: string;
     student_id_number: string;
     course: string;
     semester: number;
+    password: string;
+    college_id?: string | undefined;
     roll_number?: string | undefined;
     id_card_url?: string | undefined;
+    college_code?: string | undefined;
 }, {
     email: string;
     phone: string;
     full_name: string;
-    password: string;
-    college_id: string;
     student_id_number: string;
     course: string;
     semester: number;
+    password: string;
+    college_id?: string | undefined;
     roll_number?: string | undefined;
     id_card_url?: string | undefined;
+    college_code?: string | undefined;
+}>, {
+    email: string;
+    phone: string;
+    full_name: string;
+    student_id_number: string;
+    course: string;
+    semester: number;
+    password: string;
+    college_id?: string | undefined;
+    roll_number?: string | undefined;
+    id_card_url?: string | undefined;
+    college_code?: string | undefined;
+}, {
+    email: string;
+    phone: string;
+    full_name: string;
+    student_id_number: string;
+    course: string;
+    semester: number;
+    password: string;
+    college_id?: string | undefined;
+    roll_number?: string | undefined;
+    id_card_url?: string | undefined;
+    college_code?: string | undefined;
 }>;
 export declare const loginSchema: z.ZodObject<{
     emailOrPhone: z.ZodString;
@@ -63,6 +90,184 @@ export declare const verifyOtpSchema: z.ZodObject<{
     phone: string;
     otp: string;
 }>;
+export declare const changePasswordSchema: z.ZodEffects<z.ZodEffects<z.ZodObject<{
+    currentPassword: z.ZodString;
+    newPassword: z.ZodString;
+    confirmPassword: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}, {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}>, {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}, {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}>, {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}, {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+}>;
+export declare const forgotPasswordSchema: z.ZodEffects<z.ZodObject<{
+    identifier: z.ZodOptional<z.ZodString>;
+    emailOrPhone: z.ZodOptional<z.ZodString>;
+    email: z.ZodOptional<z.ZodString>;
+    phone: z.ZodOptional<z.ZodString>;
+    role: z.ZodOptional<z.ZodEnum<["STUDENT", "DRIVER", "ADMIN"]>>;
+}, "strip", z.ZodTypeAny, {
+    identifier?: string | undefined;
+    email?: string | undefined;
+    phone?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    identifier?: string | undefined;
+    email?: string | undefined;
+    phone?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}>, {
+    identifier?: string | undefined;
+    email?: string | undefined;
+    phone?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    identifier?: string | undefined;
+    email?: string | undefined;
+    phone?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}>;
+export declare const verifyRecoveryOtpSchema: z.ZodEffects<z.ZodObject<{
+    identifier: z.ZodOptional<z.ZodString>;
+    emailOrPhone: z.ZodOptional<z.ZodString>;
+    otp: z.ZodString;
+    purpose: z.ZodDefault<z.ZodEnum<["PASSWORD_RESET", "LOGIN", "VERIFICATION"]>>;
+    role: z.ZodOptional<z.ZodEnum<["STUDENT", "DRIVER", "ADMIN"]>>;
+}, "strip", z.ZodTypeAny, {
+    otp: string;
+    purpose: "PASSWORD_RESET" | "LOGIN" | "VERIFICATION";
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    otp: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    purpose?: "PASSWORD_RESET" | "LOGIN" | "VERIFICATION" | undefined;
+    emailOrPhone?: string | undefined;
+}>, {
+    otp: string;
+    purpose: "PASSWORD_RESET" | "LOGIN" | "VERIFICATION";
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    otp: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    purpose?: "PASSWORD_RESET" | "LOGIN" | "VERIFICATION" | undefined;
+    emailOrPhone?: string | undefined;
+}>;
+export declare const resetPasswordSchema: z.ZodEffects<z.ZodEffects<z.ZodObject<{
+    identifier: z.ZodOptional<z.ZodString>;
+    emailOrPhone: z.ZodOptional<z.ZodString>;
+    resetToken: z.ZodString;
+    role: z.ZodOptional<z.ZodEnum<["STUDENT", "DRIVER", "ADMIN"]>>;
+    newPassword: z.ZodString;
+    confirmPassword: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    resetToken: string;
+    newPassword: string;
+    confirmPassword: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    resetToken: string;
+    newPassword: string;
+    confirmPassword: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}>, {
+    resetToken: string;
+    newPassword: string;
+    confirmPassword: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    resetToken: string;
+    newPassword: string;
+    confirmPassword: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}>, {
+    resetToken: string;
+    newPassword: string;
+    confirmPassword: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}, {
+    resetToken: string;
+    newPassword: string;
+    confirmPassword: string;
+    identifier?: string | undefined;
+    role?: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
+    emailOrPhone?: string | undefined;
+}>;
+export declare const updateProfileSchema: z.ZodObject<{
+    full_name: z.ZodOptional<z.ZodString>;
+    phone: z.ZodOptional<z.ZodString>;
+    email: z.ZodOptional<z.ZodString>;
+    profile_photo_url: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodLiteral<"">]>>;
+    address: z.ZodOptional<z.ZodString>;
+    course: z.ZodOptional<z.ZodString>;
+    semester: z.ZodOptional<z.ZodNumber>;
+    student_id_number: z.ZodOptional<z.ZodString>;
+    roll_number: z.ZodOptional<z.ZodString>;
+    license_number: z.ZodOptional<z.ZodString>;
+    department: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    email?: string | undefined;
+    phone?: string | undefined;
+    full_name?: string | undefined;
+    student_id_number?: string | undefined;
+    roll_number?: string | undefined;
+    course?: string | undefined;
+    semester?: number | undefined;
+    license_number?: string | undefined;
+    department?: string | undefined;
+    address?: string | undefined;
+    profile_photo_url?: string | undefined;
+}, {
+    email?: string | undefined;
+    phone?: string | undefined;
+    full_name?: string | undefined;
+    student_id_number?: string | undefined;
+    roll_number?: string | undefined;
+    course?: string | undefined;
+    semester?: number | undefined;
+    license_number?: string | undefined;
+    department?: string | undefined;
+    address?: string | undefined;
+    profile_photo_url?: string | undefined;
+}>;
 export declare const createPickupPointSchema: z.ZodObject<{
     college_id: z.ZodString;
     name: z.ZodString;
@@ -73,8 +278,8 @@ export declare const createPickupPointSchema: z.ZodObject<{
     distance_to_college_km: z.ZodOptional<z.ZodNumber>;
     is_approved: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
-    college_id: string;
     name: string;
+    college_id: string;
     address: string;
     latitude: number;
     longitude: number;
@@ -82,8 +287,8 @@ export declare const createPickupPointSchema: z.ZodObject<{
     landmark?: string | undefined;
     distance_to_college_km?: number | undefined;
 }, {
-    college_id: string;
     name: string;
+    college_id: string;
     address: string;
     latitude: number;
     longitude: number;
@@ -120,8 +325,8 @@ export declare const createRouteSchema: z.ZodObject<{
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
     code: string;
-    college_id: string;
     name: string;
+    college_id: string;
     morning_departure_time: string;
     evening_departure_time: string;
     estimated_duration_mins: number;
@@ -132,13 +337,13 @@ export declare const createRouteSchema: z.ZodObject<{
         morning_pickup_time: string;
         evening_drop_time: string;
     }[];
+    default_driver_id?: string | undefined;
     description?: string | undefined;
     default_vehicle_id?: string | undefined;
-    default_driver_id?: string | undefined;
 }, {
     code: string;
-    college_id: string;
     name: string;
+    college_id: string;
     morning_departure_time: string;
     evening_departure_time: string;
     stops: {
@@ -147,10 +352,10 @@ export declare const createRouteSchema: z.ZodObject<{
         morning_pickup_time: string;
         evening_drop_time: string;
     }[];
+    default_driver_id?: string | undefined;
     description?: string | undefined;
     estimated_duration_mins?: number | undefined;
     default_vehicle_id?: string | undefined;
-    default_driver_id?: string | undefined;
     max_capacity?: number | undefined;
 }>;
 export declare const createVehicleSchema: z.ZodObject<{
@@ -163,8 +368,8 @@ export declare const createVehicleSchema: z.ZodObject<{
     insurance_validity: z.ZodString;
     fitness_validity: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    college_id: string;
     type: "CAB_4" | "CAB_6" | "SHUTTLE_12" | "BUS_24";
+    college_id: string;
     vehicle_number: string;
     model: string;
     seating_capacity: number;
@@ -172,8 +377,8 @@ export declare const createVehicleSchema: z.ZodObject<{
     insurance_validity: string;
     fitness_validity: string;
 }, {
-    college_id: string;
     type: "CAB_4" | "CAB_6" | "SHUTTLE_12" | "BUS_24";
+    college_id: string;
     vehicle_number: string;
     model: string;
     seating_capacity: number;
@@ -197,8 +402,8 @@ export declare const createPlanSchema: z.ZodObject<{
     cancellation_fee_percentage: z.ZodDefault<z.ZodNumber>;
     additional_ride_charge: z.ZodDefault<z.ZodNumber>;
 }, "strip", z.ZodTypeAny, {
-    college_id: string;
     name: string;
+    college_id: string;
     tier: "BASIC" | "STANDARD" | "PREMIUM";
     price: number;
     validity_days: number;
@@ -212,8 +417,8 @@ export declare const createPlanSchema: z.ZodObject<{
     additional_ride_charge: number;
     description?: string | undefined;
 }, {
-    college_id: string;
     name: string;
+    college_id: string;
     tier: "BASIC" | "STANDARD" | "PREMIUM";
     price: number;
     validity_days: number;
@@ -342,14 +547,65 @@ export declare const createHolidaySchema: z.ZodObject<{
     is_service_disabled: z.ZodDefault<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
     college_id: string;
-    holiday_date: string;
     title: string;
+    holiday_date: string;
     holiday_type: "COLLEGE_HOLIDAY" | "EXAM_HOLIDAY" | "SUNDAY" | "SPECIAL";
     is_service_disabled: boolean;
 }, {
     college_id: string;
-    holiday_date: string;
     title: string;
+    holiday_date: string;
     holiday_type?: "COLLEGE_HOLIDAY" | "EXAM_HOLIDAY" | "SUNDAY" | "SPECIAL" | undefined;
     is_service_disabled?: boolean | undefined;
+}>;
+export declare const createAdminSchema: z.ZodObject<{
+    email: z.ZodString;
+    phone: z.ZodString;
+    full_name: z.ZodString;
+    password: z.ZodString;
+    department: z.ZodDefault<z.ZodString>;
+    permissions: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+}, "strip", z.ZodTypeAny, {
+    email: string;
+    phone: string;
+    full_name: string;
+    department: string;
+    permissions: string[];
+    password: string;
+}, {
+    email: string;
+    phone: string;
+    full_name: string;
+    password: string;
+    department?: string | undefined;
+    permissions?: string[] | undefined;
+}>;
+export declare const createAdminProfileSchema: z.ZodObject<{
+    user_id: z.ZodOptional<z.ZodString>;
+    full_name: z.ZodOptional<z.ZodString>;
+    department: z.ZodDefault<z.ZodString>;
+    permissions: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+}, "strip", z.ZodTypeAny, {
+    department: string;
+    permissions: string[];
+    full_name?: string | undefined;
+    user_id?: string | undefined;
+}, {
+    full_name?: string | undefined;
+    department?: string | undefined;
+    permissions?: string[] | undefined;
+    user_id?: string | undefined;
+}>;
+export declare const updateAdminProfileSchema: z.ZodObject<{
+    full_name: z.ZodOptional<z.ZodString>;
+    department: z.ZodOptional<z.ZodString>;
+    permissions: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+}, "strip", z.ZodTypeAny, {
+    full_name?: string | undefined;
+    department?: string | undefined;
+    permissions?: string[] | undefined;
+}, {
+    full_name?: string | undefined;
+    department?: string | undefined;
+    permissions?: string[] | undefined;
 }>;

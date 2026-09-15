@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -8,6 +8,7 @@ import {
   Route,
   Car,
   ShieldCheck,
+  GitFork,
   CreditCard,
   Layers,
   CalendarCheck,
@@ -37,6 +38,7 @@ export const Layout: React.FC = () => {
     { label: 'Routes', path: '/routes', icon: Route },
     { label: 'Vehicles', path: '/vehicles', icon: Car },
     { label: 'Drivers', path: '/drivers', icon: ShieldCheck },
+    { label: 'Assignments', path: '/assignments', icon: GitFork },
     { label: 'Plans', path: '/plans', icon: CreditCard },
     { label: 'Subscriptions', path: '/subscriptions', icon: Layers },
     { label: 'Bookings', path: '/bookings', icon: CalendarCheck },
@@ -93,18 +95,24 @@ export const Layout: React.FC = () => {
         {/* User profile & Logout */}
         <div className="p-4 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-semibold text-xs text-white">
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 overflow-hidden hover:opacity-80 transition group"
+              title="View Profile & Settings"
+            >
+              <div className="w-8 h-8 rounded-full bg-emerald-600/30 border border-emerald-500/40 flex items-center justify-center font-semibold text-xs text-emerald-300 group-hover:scale-105 transition">
                 {user?.full_name?.charAt(0) || 'A'}
               </div>
               <div className="overflow-hidden">
-                <p className="text-xs font-medium text-white truncate">{user?.full_name}</p>
-                <p className="text-[10px] text-slate-400 truncate">Administrator</p>
+                <p className="text-xs font-medium text-white truncate group-hover:text-emerald-400 transition">
+                  {user?.full_name}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate">Administrator Profile</p>
               </div>
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
-              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
+              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition shrink-0"
               title="Logout"
             >
               <LogOut className="w-4 h-4" />
@@ -136,10 +144,14 @@ export const Layout: React.FC = () => {
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
               </button>
             </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold text-white">{user?.full_name}</p>
+            <Link
+              to="/profile"
+              className="text-right hidden sm:block hover:opacity-80 transition group"
+              title="View Profile & Security"
+            >
+              <p className="text-xs font-semibold text-white group-hover:text-emerald-400 transition">{user?.full_name}</p>
               <p className="text-[10px] text-slate-400">{user?.email}</p>
-            </div>
+            </Link>
           </div>
         </header>
 

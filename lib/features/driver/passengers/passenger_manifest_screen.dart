@@ -12,14 +12,32 @@ class PassengerManifestScreen extends StatefulWidget {
 class _PassengerManifestScreenState extends State<PassengerManifestScreen> {
   List<dynamic> _passengers = [];
   bool _isLoading = true;
-  String _filter = 'ALL'; // 'ALL', 'WAITING', 'BOARDED', 'NO_SHOW'
+  String _filter = 'ALL'; // 'ALL', 'WAITING', 'BOARDED'
+  String? _tripName;
 
   Future<void> _fetchManifest() async {
     try {
-      final res = await apiClient.get('/drivers/trips/77777777-7777-7777-7777-777777777771/manifest');
-      if (res.data['success'] == true && mounted) {
+      final dashRes = await apiClient.get('/drivers/dashboard');
+      if (dashRes.data['success'] == true) {
+        final activeTrip = dashRes.data['data']?['activeTrip'];
+        if (activeTrip != null && activeTrip['id'] != null) {
+          final tripId = activeTrip['id'];
+          setState(() {
+            _tripName = activeTrip['route']?['name'] ?? 'Scheduled Route';
+          });
+          final res = await apiClient.get('/drivers/trips/$tripId/manifest');
+          if (res.data['success'] == true && mounted) {
+            setState(() {
+              _passengers = res.data['data'] ?? [];
+              _isLoading = false;
+            });
+            return;
+          }
+        }
+      }
+      if (mounted) {
         setState(() {
-          _passengers = res.data['data'] ?? [];
+          _passengers = [];
           _isLoading = false;
         });
       }
@@ -43,7 +61,7 @@ class _PassengerManifestScreenState extends State<PassengerManifestScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Live Passenger Manifest'),
+        title: Text(_tripName != null ? 'Manifest: $_tripName' : 'Passenger Manifest'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
@@ -75,7 +93,7 @@ class _PassengerManifestScreenState extends State<PassengerManifestScreen> {
                 Expanded(
                   child: filtered.isEmpty
                       ? const Center(
-                          child: Text('No passengers in this category.', style: TextStyle(color: AppColors.textMuted)),
+                          child: Text('No passengers assigned to this trip yet.', style: TextStyle(color: AppColors.textMuted)),
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
@@ -121,18 +139,19 @@ class _PassengerManifestScreenState extends State<PassengerManifestScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          p['student']?['full_name'] ?? 'Aarav Sharma',
+                                          p['student']?['full_name'] ?? 'Passenger',
                                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'Pickup: ${p['pickup_point']?['name'] ?? 'Sector 18 Metro'}',
+                                          'Pickup: ${p['pickup_point']?['name'] ?? 'Designated Stop'}',
                                           style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                                         ),
-                                        Text(
-                                          'Phone: ${p['student']?['phone'] ?? '+919999900004'}',
-                                          style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-                                        ),
+                                        if (p['student']?['phone'] != null)
+                                          Text(
+                                            'Phone: ${p['student']['phone']}',
+                                            style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                                          ),
                                       ],
                                     ),
                                   ),

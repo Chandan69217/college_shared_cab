@@ -8,7 +8,13 @@ import {
   DollarSign,
   TrendingUp,
   AlertCircle,
+  Loader2,
+  GitFork,
+  ArrowRight,
+  ShieldAlert,
+  Calendar,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   ResponsiveContainer,
   BarChart,
@@ -27,16 +33,29 @@ import { DashboardStats } from '../types';
 
 export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
-    totalStudents: 1250,
-    activeSubscriptions: 980,
-    todaysTrips: 85,
-    activeVehicles: 30,
-    activeDrivers: 32,
-    todayRevenue: 84500,
-    totalRevenue: 1245000,
-    averageOccupancy: 82,
-    pendingVerifications: 14,
+    totalStudents: 0,
+    activeStudents: 0,
+    verifiedStudents: 0,
+    pendingVerifications: 0,
+    totalDrivers: 0,
+    activeDrivers: 0,
+    onLeaveDrivers: 0,
+    totalVehicles: 0,
+    activeVehicles: 0,
+    maintenanceVehicles: 0,
+    totalRoutes: 0,
+    activeRoutes: 0,
+    assignedVehiclesCount: 0,
+    assignedDriversCount: 0,
+    todaysTrips: 0,
+    activeTrips: 0,
+    todayRevenue: 0,
+    totalRevenue: 0,
+    averageOccupancy: 0,
+    activeSubscriptions: 0,
   });
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [planDistribution, setPlanDistribution] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +63,31 @@ export const Dashboard: React.FC = () => {
       try {
         const res = await api.get('/admin/dashboard-stats');
         if (res.data.success) {
-          setStats(res.data.data);
+          const data = res.data.data;
+          setStats({
+            totalStudents: data.totalStudents || 0,
+            activeStudents: data.activeStudents || 0,
+            verifiedStudents: data.verifiedStudents || 0,
+            pendingVerifications: data.pendingVerifications || 0,
+            totalDrivers: data.totalDrivers || 0,
+            activeDrivers: data.activeDrivers || 0,
+            onLeaveDrivers: data.onLeaveDrivers || 0,
+            totalVehicles: data.totalVehicles || 0,
+            activeVehicles: data.activeVehicles || 0,
+            maintenanceVehicles: data.maintenanceVehicles || 0,
+            totalRoutes: data.totalRoutes || 0,
+            activeRoutes: data.activeRoutes || 0,
+            assignedVehiclesCount: data.assignedVehiclesCount || 0,
+            assignedDriversCount: data.assignedDriversCount || 0,
+            todaysTrips: data.todaysTrips || 0,
+            activeTrips: data.activeTrips || 0,
+            todayRevenue: data.todayRevenue || 0,
+            totalRevenue: data.totalRevenue || 0,
+            averageOccupancy: data.averageOccupancy || 0,
+            activeSubscriptions: data.activeSubscriptions || 0,
+          });
+          setWeeklyData(data.weeklyData || []);
+          setPlanDistribution(data.planDistribution || []);
         }
       } catch (err) {
         console.error('Failed to fetch dashboard stats', err);
@@ -55,21 +98,14 @@ export const Dashboard: React.FC = () => {
     fetchStats();
   }, []);
 
-  const weeklyData = [
-    { day: 'Mon', rides: 82, revenue: 82000, occupancy: 86 },
-    { day: 'Tue', rides: 88, revenue: 88000, occupancy: 88 },
-    { day: 'Wed', rides: 84, revenue: 84000, occupancy: 84 },
-    { day: 'Thu', rides: 91, revenue: 91000, occupancy: 91 },
-    { day: 'Fri', rides: 89, revenue: 89000, occupancy: 89 },
-    { day: 'Sat', rides: 42, revenue: 42000, occupancy: 65 },
-    { day: 'Sun', rides: 0, revenue: 0, occupancy: 0 },
-  ];
-
-  const planDistribution = [
-    { name: 'Basic Pass', value: 280, color: '#3b82f6' },
-    { name: 'Standard Pass', value: 520, color: '#10b981' },
-    { name: 'Premium Pass', value: 180, color: '#8b5cf6' },
-  ];
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-400 gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+        <p className="text-sm font-medium">Loading live transport operations from database...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -80,79 +116,159 @@ export const Dashboard: React.FC = () => {
             Apex Institute Transport Command Center
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time fleet operations, subscription telemetry, and passenger manifest overview
+            Live fleet operations, route assignments, subscription telemetry, and passenger manifest
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {stats.pendingVerifications > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">
+            <Link
+              to="/students"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition"
+            >
               <AlertCircle className="w-4 h-4" />
-              <span>{stats.pendingVerifications} Pending Student Verifications</span>
-            </div>
+              <span>{stats.pendingVerifications} Pending KYC Reviews</span>
+            </Link>
           )}
+          {stats.maintenanceVehicles && stats.maintenanceVehicles > 0 ? (
+            <Link
+              to="/vehicles"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium hover:bg-rose-500/20 transition"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>{stats.maintenanceVehicles} In Maintenance</span>
+            </Link>
+          ) : null}
         </div>
       </div>
 
-      {/* Primary KPI Cards Grid */}
+      {/* Primary KPI Grid: Live Operations */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Students"
+          title="Students Directory"
           value={stats.totalStudents.toLocaleString()}
-          subtitle="Enrolled students across batches"
+          subtitle={`${stats.verifiedStudents ?? stats.activeStudents ?? 0} verified accounts`}
           icon={Users}
-          trend="+12% this month"
           color="blue"
         />
         <StatCard
-          title="Active Subscriptions"
-          value={stats.activeSubscriptions.toLocaleString()}
-          subtitle="78.4% subscription coverage"
-          icon={Layers}
-          trend="+8% this term"
-          color="emerald"
-        />
-        <StatCard
-          title="Today's Trips"
-          value={stats.todaysTrips}
-          subtitle="44 Morning | 41 Evening"
-          icon={Navigation}
-          trend="100% on schedule"
-          color="indigo"
-        />
-        <StatCard
-          title="Today's Revenue"
-          value={`₹${stats.todayRevenue.toLocaleString()}`}
-          subtitle={`₹${(stats.totalRevenue / 100000).toFixed(1)}L total volume`}
-          icon={DollarSign}
-          trend="+15.2% vs avg"
-          color="amber"
-        />
-      </div>
-
-      {/* Secondary Operational Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          title="Active Vehicles"
-          value={`${stats.activeVehicles} Cabs & Shuttles`}
-          subtitle="100% fleet fitness certified"
+          title="Fleet Operations"
+          value={`${stats.totalVehicles ?? stats.activeVehicles} Vehicles`}
+          subtitle={`${stats.activeVehicles} active • ${stats.maintenanceVehicles ?? 0} in service`}
           icon={Car}
           color="purple"
         />
         <StatCard
-          title="Active Drivers"
-          value={`${stats.activeDrivers} On-Duty`}
-          subtitle="Avg Rating: 4.89 / 5.0 ⭐"
+          title="Driver Corps"
+          value={`${stats.totalDrivers ?? stats.activeDrivers} Drivers`}
+          subtitle={`${stats.activeDrivers} on duty • ${stats.onLeaveDrivers ?? 0} on leave`}
           icon={ShieldCheck}
           color="emerald"
         />
         <StatCard
-          title="Average Occupancy"
+          title="Transit Routes"
+          value={`${stats.totalRoutes ?? stats.activeRoutes ?? 0} Routes`}
+          subtitle={`${stats.assignedVehiclesCount ?? 0} cabs & shuttles assigned`}
+          icon={Navigation}
+          color="indigo"
+        />
+      </div>
+
+      {/* Secondary Metrics: Ride & Financial Telemetry */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Today's Trips"
+          value={stats.todaysTrips}
+          subtitle={`${stats.activeTrips ?? 0} in-progress transit`}
+          icon={Calendar}
+          color="indigo"
+        />
+        <StatCard
+          title="Active Subscriptions"
+          value={stats.activeSubscriptions.toLocaleString()}
+          subtitle="Valid student transit passes"
+          icon={Layers}
+          color="emerald"
+        />
+        <StatCard
+          title="Capacity Occupancy"
           value={`${stats.averageOccupancy}%`}
-          subtitle="Optimal capacity utilization"
+          subtitle="Average vehicle seating load"
           icon={TrendingUp}
-          trend="Target: >80%"
           color="blue"
         />
+        <StatCard
+          title="Today's Revenue"
+          value={`₹${stats.todayRevenue.toLocaleString()}`}
+          subtitle={`₹${(stats.totalRevenue / 100000).toFixed(1)}L total collection`}
+          icon={DollarSign}
+          color="amber"
+        />
+      </div>
+
+      {/* Quick Navigation / Management Hub Bar */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Operational Management Shortcuts
+          </h3>
+          <span className="text-[11px] text-slate-500">Live Database CRUD Modules</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <Link
+            to="/vehicles"
+            className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/50 transition group text-xs"
+          >
+            <div className="flex items-center gap-2">
+              <Car className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-slate-200">Vehicles</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          <Link
+            to="/routes"
+            className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/50 transition group text-xs"
+          >
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-slate-200">Routes</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          <Link
+            to="/drivers"
+            className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/50 transition group text-xs"
+          >
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-slate-200">Drivers</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          <Link
+            to="/students"
+            className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/50 transition group text-xs"
+          >
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-slate-200">Students & KYC</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          <Link
+            to="/assignments"
+            className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/50 transition group text-xs col-span-2 sm:col-span-1"
+          >
+            <div className="flex items-center gap-2">
+              <GitFork className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-slate-200">Assignments</span>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        </div>
       </div>
 
       {/* Charts Section */}
@@ -168,24 +284,30 @@ export const Dashboard: React.FC = () => {
               Last 7 Days
             </span>
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="day" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar dataKey="rides" fill="#10b981" radius={[4, 4, 0, 0]} name="Completed Trips" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {weeklyData.length > 0 ? (
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="day" stroke="#64748b" fontSize={11} />
+                  <YAxis stroke="#64748b" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#334155',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar dataKey="rides" fill="#10b981" radius={[4, 4, 0, 0]} name="Scheduled Trips" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-xs text-slate-500">
+              No trip data recorded in the last 7 days.
+            </div>
+          )}
         </div>
 
         {/* Subscription Plan Distribution Pie Chart */}
@@ -194,44 +316,52 @@ export const Dashboard: React.FC = () => {
             <h3 className="font-bold text-sm text-white">Subscription Distribution</h3>
             <p className="text-xs text-slate-400">Active commuter passes by tier</p>
           </div>
-          <div className="h-48 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={planDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={70}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {planDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-2 pt-2 border-t border-slate-800">
-            {planDistribution.map((plan) => (
-              <div key={plan.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: plan.color }} />
-                  <span className="text-slate-300">{plan.name}</span>
-                </div>
-                <span className="font-semibold text-white">{plan.value} students</span>
+          {planDistribution.length > 0 ? (
+            <>
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={planDistribution}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {planDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        borderColor: '#334155',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                {planDistribution.map((plan) => (
+                  <div key={plan.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: plan.color }} />
+                      <span className="text-slate-300">{plan.name}</span>
+                    </div>
+                    <span className="font-semibold text-white">{plan.value} subscribers</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="h-48 flex items-center justify-center text-xs text-slate-500">
+              No active subscriptions found in database.
+            </div>
+          )}
         </div>
       </div>
     </div>

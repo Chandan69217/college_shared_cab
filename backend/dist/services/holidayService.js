@@ -1,35 +1,30 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HolidayService = void 0;
-const db_1 = require("../database/db");
+const holidayRepository_1 = require("../repositories/holidayRepository");
 class HolidayService {
     /**
-     * Check if a given date is a non-service holiday
+     * Check if a given date is a non-service holiday in Supabase
      */
     static async isHoliday(collegeId, dateStr) {
-        for (const holiday of db_1.db.holidays.values()) {
-            if (holiday.college_id === collegeId && holiday.holiday_date === dateStr && holiday.is_service_disabled) {
-                return { isHoliday: true, holiday };
-            }
+        const holidays = await holidayRepository_1.HolidayRepository.findAll(collegeId);
+        const matched = holidays.find((h) => h.holiday_date === dateStr && h.is_service_disabled);
+        if (matched) {
+            return { isHoliday: true, holiday: matched };
         }
         return { isHoliday: false };
     }
     /**
-     * Add a college holiday
+     * Add a college holiday in Supabase
      */
     static async addHoliday(data) {
-        const id = `hol-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        const holiday = {
-            id,
+        return holidayRepository_1.HolidayRepository.create({
             college_id: data.college_id,
             holiday_date: data.holiday_date,
             title: data.title,
             holiday_type: data.holiday_type,
             is_service_disabled: data.is_service_disabled,
-            created_at: new Date().toISOString(),
-        };
-        db_1.db.holidays.set(id, holiday);
-        return holiday;
+        });
     }
 }
 exports.HolidayService = HolidayService;

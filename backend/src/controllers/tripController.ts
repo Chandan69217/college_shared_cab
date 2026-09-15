@@ -1,27 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import { db } from '../database/db';
 import { TrackingService } from '../services/trackingService';
 import { updateGpsLocationSchema } from '../validators/schemas';
 import { sendSuccess } from '../utils/response';
-import { Trip } from '../types';
+import { TripRepository } from '../repositories/tripRepository';
+import { VehicleRepository } from '../repositories/vehicleRepository';
 
 export class TripController {
   public static async getTrips(req: Request, res: Response, next: NextFunction) {
     try {
       const date = req.query.date as string;
-      let trips = Array.from(db.trips.values());
-      if (date) {
-        trips = trips.filter((t) => t.trip_date === date);
-      }
-
-      const hydrated = trips.map((t) => ({
-        ...t,
-        route: db.routes.get(t.route_id),
-        vehicle: db.vehicles.get(t.vehicle_id),
-        driver: db.users.get(t.driver_id),
-      }));
-
-      sendSuccess(res, 'Trips retrieved.', hydrated);
+      const trips = await TripRepository.findAll(undefined, date);
+      sendSuccess(res, 'Trips retrieved.', trips);
     } catch (err) {
       next(err);
     }
@@ -29,12 +18,9 @@ export class TripController {
 
   public static async createTrip(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = `trip-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const now = new Date().toISOString();
-      const vehicle = db.vehicles.get(req.body.vehicle_id);
+      const vehicle = await VehicleRepository.findById(req.body.vehicle_id);
 
-      const trip: Trip = {
-        id,
+      const trip = await TripRepository.create({
         route_id: req.body.route_id,
         vehicle_id: req.body.vehicle_id,
         driver_id: req.body.driver_id,
@@ -45,11 +31,8 @@ export class TripController {
         max_capacity: vehicle?.seating_capacity || 6,
         booked_seats: 0,
         boarded_passengers: 0,
-        created_at: now,
-        updated_at: now,
-      };
+      });
 
-      db.trips.set(id, trip);
       sendSuccess(res, 'Trip scheduled successfully.', trip, 201);
     } catch (err) {
       next(err);

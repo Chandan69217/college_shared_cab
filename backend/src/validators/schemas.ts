@@ -1,17 +1,23 @@
 import { z } from 'zod';
 
-export const registerStudentSchema = z.object({
-  email: z.string().email(),
-  phone: z.string().min(10).max(15),
-  full_name: z.string().min(2).max(150),
-  password: z.string().min(6).max(100),
-  college_id: z.string().uuid(),
-  student_id_number: z.string().min(2).max(100),
-  roll_number: z.string().optional(),
-  course: z.string().min(2).max(150),
-  semester: z.number().int().min(1).max(12),
-  id_card_url: z.string().url().optional(),
-});
+export const registerStudentSchema = z
+  .object({
+    email: z.string().email(),
+    phone: z.string().min(10).max(15),
+    full_name: z.string().min(2).max(150),
+    password: z.string().min(6).max(100),
+    college_id: z.string().uuid().optional(),
+    college_code: z.string().min(2).max(50).optional(),
+    student_id_number: z.string().min(2).max(100),
+    roll_number: z.string().optional(),
+    course: z.string().min(2).max(150),
+    semester: z.number().int().min(1).max(12),
+    id_card_url: z.string().url().optional(),
+  })
+  .refine((data) => data.college_id || data.college_code, {
+    message: 'Either college_code or college_id must be provided for registration.',
+    path: ['college_code'],
+  });
 
 export const loginSchema = z.object({
   emailOrPhone: z.string().min(3),
@@ -26,6 +32,97 @@ export const requestOtpSchema = z.object({
 export const verifyOtpSchema = z.object({
   phone: z.string().min(10).max(15),
   otp: z.string().length(6),
+});
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required.'),
+    newPassword: z
+      .string()
+      .min(8, 'New password must be at least 8 characters long.')
+      .regex(/[A-Z]/, 'New password must contain at least one uppercase letter.')
+      .regex(/[a-z]/, 'New password must contain at least one lowercase letter.')
+      .regex(/[0-9]/, 'New password must contain at least one number.')
+      .regex(/[^A-Za-z0-9]/, 'New password must contain at least one special character.'),
+    confirmPassword: z.string().min(1, 'Password confirmation is required.'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'New password and confirm password do not match.',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: 'New password cannot be the same as the current password.',
+    path: ['newPassword'],
+  });
+
+export const forgotPasswordSchema = z
+  .object({
+    identifier: z.string().min(3).optional(),
+    emailOrPhone: z.string().min(3).optional(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
+    role: z.enum(['STUDENT', 'DRIVER', 'ADMIN']).optional(),
+  })
+  .refine((data) => data.identifier || data.emailOrPhone || data.email || data.phone, {
+    message: 'Please enter your registered email address or mobile number.',
+    path: ['identifier'],
+  });
+
+export const verifyRecoveryOtpSchema = z
+  .object({
+    identifier: z.string().min(3).optional(),
+    emailOrPhone: z.string().min(3).optional(),
+    otp: z
+      .string()
+      .length(6, 'OTP must be exactly 6 digits.')
+      .regex(/^\d{6}$/, 'OTP must contain digits only.'),
+    purpose: z.enum(['PASSWORD_RESET', 'LOGIN', 'VERIFICATION']).default('PASSWORD_RESET'),
+    role: z.enum(['STUDENT', 'DRIVER', 'ADMIN']).optional(),
+  })
+  .refine((data) => data.identifier || data.emailOrPhone, {
+    message: 'Email address or mobile number is required.',
+    path: ['identifier'],
+  });
+
+export const resetPasswordSchema = z
+  .object({
+    identifier: z.string().min(3).optional(),
+    emailOrPhone: z.string().min(3).optional(),
+    resetToken: z.string().min(10, 'Valid password reset token is required.'),
+    role: z.enum(['STUDENT', 'DRIVER', 'ADMIN']).optional(),
+    newPassword: z
+      .string()
+      .min(8, 'New password must be at least 8 characters long.')
+      .regex(/[A-Z]/, 'New password must contain at least one uppercase letter.')
+      .regex(/[a-z]/, 'New password must contain at least one lowercase letter.')
+      .regex(/[0-9]/, 'New password must contain at least one number.')
+      .regex(/[^A-Za-z0-9]/, 'New password must contain at least one special character.'),
+    confirmPassword: z.string().min(1, 'Password confirmation is required.'),
+  })
+  .refine((data) => data.identifier || data.emailOrPhone, {
+    message: 'Email address or mobile number is required.',
+    path: ['identifier'],
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'New password and confirm password do not match.',
+    path: ['confirmPassword'],
+  });
+
+export const updateProfileSchema = z.object({
+  full_name: z.string().min(2, 'Full name must be at least 2 characters.').max(150).optional(),
+  phone: z.string().min(10, 'Phone must be at least 10 digits.').max(15).optional(),
+  email: z.string().email('Invalid email address format.').optional(),
+  profile_photo_url: z.string().url('Invalid photo URL.').or(z.literal('')).optional(),
+  address: z.string().max(300).optional(),
+  // Student fields
+  course: z.string().max(150).optional(),
+  semester: z.number().int().min(1).max(12).optional(),
+  student_id_number: z.string().max(100).optional(),
+  roll_number: z.string().max(100).optional(),
+  // Driver fields
+  license_number: z.string().max(100).optional(),
+  // Admin fields
+  department: z.string().max(100).optional(),
 });
 
 export const createPickupPointSchema = z.object({
@@ -153,3 +250,26 @@ export const createHolidaySchema = z.object({
   holiday_type: z.enum(['COLLEGE_HOLIDAY', 'EXAM_HOLIDAY', 'SUNDAY', 'SPECIAL']).default('COLLEGE_HOLIDAY'),
   is_service_disabled: z.boolean().default(true),
 });
+
+export const createAdminSchema = z.object({
+  email: z.string().email(),
+  phone: z.string().min(10).max(15),
+  full_name: z.string().min(2).max(150),
+  password: z.string().min(6).max(100),
+  department: z.string().min(2).max(100).default('Operations'),
+  permissions: z.array(z.string()).default(['ALL']),
+});
+
+export const createAdminProfileSchema = z.object({
+  user_id: z.string().uuid().optional(),
+  full_name: z.string().min(2).max(150).optional(),
+  department: z.string().min(2).max(100).default('Operations'),
+  permissions: z.array(z.string()).default(['ALL']),
+});
+
+export const updateAdminProfileSchema = z.object({
+  full_name: z.string().min(2).max(150).optional(),
+  department: z.string().min(2).max(100).optional(),
+  permissions: z.array(z.string()).optional(),
+});
+

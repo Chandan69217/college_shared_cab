@@ -1,25 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TripController = void 0;
-const db_1 = require("../database/db");
 const trackingService_1 = require("../services/trackingService");
 const schemas_1 = require("../validators/schemas");
 const response_1 = require("../utils/response");
+const tripRepository_1 = require("../repositories/tripRepository");
+const vehicleRepository_1 = require("../repositories/vehicleRepository");
 class TripController {
     static async getTrips(req, res, next) {
         try {
             const date = req.query.date;
-            let trips = Array.from(db_1.db.trips.values());
-            if (date) {
-                trips = trips.filter((t) => t.trip_date === date);
-            }
-            const hydrated = trips.map((t) => ({
-                ...t,
-                route: db_1.db.routes.get(t.route_id),
-                vehicle: db_1.db.vehicles.get(t.vehicle_id),
-                driver: db_1.db.users.get(t.driver_id),
-            }));
-            (0, response_1.sendSuccess)(res, 'Trips retrieved.', hydrated);
+            const trips = await tripRepository_1.TripRepository.findAll(undefined, date);
+            (0, response_1.sendSuccess)(res, 'Trips retrieved.', trips);
         }
         catch (err) {
             next(err);
@@ -27,11 +19,8 @@ class TripController {
     }
     static async createTrip(req, res, next) {
         try {
-            const id = `trip-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-            const now = new Date().toISOString();
-            const vehicle = db_1.db.vehicles.get(req.body.vehicle_id);
-            const trip = {
-                id,
+            const vehicle = await vehicleRepository_1.VehicleRepository.findById(req.body.vehicle_id);
+            const trip = await tripRepository_1.TripRepository.create({
                 route_id: req.body.route_id,
                 vehicle_id: req.body.vehicle_id,
                 driver_id: req.body.driver_id,
@@ -42,10 +31,7 @@ class TripController {
                 max_capacity: vehicle?.seating_capacity || 6,
                 booked_seats: 0,
                 boarded_passengers: 0,
-                created_at: now,
-                updated_at: now,
-            };
-            db_1.db.trips.set(id, trip);
+            });
             (0, response_1.sendSuccess)(res, 'Trip scheduled successfully.', trip, 201);
         }
         catch (err) {

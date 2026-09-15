@@ -25,5 +25,19 @@ exports.ENV = {
     MAPS_API_KEY: process.env.MAPS_API_KEY || 'dummy_maps_key_for_demo',
     FCM_SERVER_KEY: process.env.FCM_SERVER_KEY || 'dummy_fcm_key_for_demo',
     DEFAULT_SERVICE_RADIUS_KM: parseFloat(process.env.DEFAULT_SERVICE_RADIUS_KM || '10.0'),
+    // Email Configuration (SMTP)
+    SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
+    SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10),
+    SMTP_SECURE: process.env.SMTP_SECURE === 'true',
+    SMTP_USER: process.env.SMTP_USER || '',
+    SMTP_PASS: process.env.SMTP_PASS || '',
+    SMTP_FROM: process.env.SMTP_FROM || '"CampusRide Security" <no-reply@campusride.com>',
+    // SMS Gateway Configuration
+    SMS_GATEWAY_PROVIDER: process.env.SMS_GATEWAY_PROVIDER || 'SIMULATOR',
+    FAST2SMS_API_KEY: process.env.FAST2SMS_API_KEY || '',
+    TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || '',
+    TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || '',
+    TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER || '',
+    MSG91_AUTH_KEY: process.env.MSG91_AUTH_KEY || '',
 };
 //# sourceMappingURL=env.js.map

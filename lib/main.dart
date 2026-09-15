@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'core/storage/storage_service.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/student_register_screen.dart';
+import 'features/auth/presentation/forgot_password_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/student/student_main_shell.dart';
 import 'features/student/plans/plans_checkout_screen.dart';
@@ -25,7 +26,9 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/login',
     redirect: (context, state) {
       final isAuth = authState.isAuthenticated;
-      final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/register';
+      final isLoggingIn = state.matchedLocation == '/login' ||
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/forgot-password';
 
       if (!isAuth) {
         return isLoggingIn ? null : '/login';
@@ -45,6 +48,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const StudentRegisterScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/student',

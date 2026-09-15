@@ -1,14 +1,14 @@
 import { CollegeHoliday } from '../types';
 export declare class HolidayService {
     /**
-     * Check if a given date is a non-service holiday
+     * Check if a given date is a non-service holiday in Supabase
      */
     static isHoliday(collegeId: string, dateStr: string): Promise<{
         isHoliday: boolean;
         holiday?: CollegeHoliday;
     }>;
     /**
-     * Add a college holiday
+     * Add a college holiday in Supabase
      */
     static addHoliday(data: {
         college_id: string;

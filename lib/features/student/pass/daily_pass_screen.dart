@@ -300,12 +300,12 @@ class _DailyPassScreenState extends ConsumerState<DailyPassScreen> {
                               ),
                               child: Column(
                                 children: [
-                                  _buildPassRow('Passenger Name', user?.fullName ?? 'Aarav Sharma'),
-                                  _buildPassRow('Assigned Route', _pass!.route?['name'] ?? 'Route 1: Central Metro Express'),
-                                  _buildPassRow('Pickup Stop', _pass!.pickup?['name'] ?? 'Sector 18 Metro Gate 2'),
+                                  _buildPassRow('Passenger Name', user?.fullName ?? 'Student'),
+                                  _buildPassRow('Assigned Route', _pass!.route?['name'] ?? 'Assigned Route'),
+                                  _buildPassRow('Pickup Stop', _pass!.pickup?['name'] ?? 'Designated Stop'),
                                   _buildPassRow(
                                     'Trip Slot',
-                                    _pass!.tripType == 'MORNING_PICKUP' ? 'Morning Pickup (07:30 AM)' : 'Evening Return (05:00 PM)',
+                                    _pass!.tripType == 'MORNING_PICKUP' ? 'Morning Pickup' : 'Evening Return',
                                   ),
                                   _buildPassRow('Cryptographic Signature', 'SHA-256 HMAC Verified', isCode: true),
                                 ],

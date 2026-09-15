@@ -1,6 +1,6 @@
 export declare class TrackingService {
     /**
-     * Updates driver live GPS coordinates during active trip
+     * Updates driver live GPS coordinates during active trip in Supabase
      */
     static updateLocation(driverId: string, tripId: string, latitude: number, longitude: number, speed?: number, heading?: number): Promise<{
         tripId: string;
@@ -11,7 +11,7 @@ export declare class TrackingService {
         updatedAt: string;
     }>;
     /**
-     * Get vehicle live location for a trip
+     * Get vehicle live location for a trip from Supabase
      */
     static getTripLocation(tripId: string): Promise<{
         tripId: string;
@@ -34,7 +34,27 @@ export declare class TrackingService {
         };
     }>;
     /**
-     * Get all active vehicles on map (for Admin monitoring)
+     * Get all active vehicles on map (for Admin monitoring) from Supabase
      */
-    static getAllActiveVehicles(): Promise<any[]>;
+    static getAllActiveVehicles(): Promise<{
+        tripId: string;
+        tripStatus: "CANCELLED" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED";
+        tripType: "MORNING_PICKUP" | "EVENING_DROP";
+        latitude: number;
+        longitude: number;
+        lastUpdated: string | undefined;
+        bookedSeats: number;
+        maxCapacity: number;
+        vehicle: {
+            id: string | undefined;
+            number: string | undefined;
+            model: string | undefined;
+        };
+        driver: {
+            id: string | undefined;
+            name: string;
+            phone: string | undefined;
+        };
+        routeName: string | undefined;
+    }[]>;
 }

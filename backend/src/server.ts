@@ -1,13 +1,21 @@
 import { createApp } from './app';
 import { ENV } from './config/env';
 import { logger } from './utils/logger';
+import { testDatabaseConnection } from './database/supabaseClient';
+import { db } from './database/db';
 
 const app = createApp();
 
-const server = app.listen(ENV.PORT, '0.0.0.0', () => {
+const server = app.listen(ENV.PORT, '0.0.0.0', async () => {
   logger.info(`🚀 College Shared Cab Backend running on port ${ENV.PORT} (0.0.0.0)`);
   logger.info(`📚 API Docs available at http://localhost:${ENV.PORT}/api/docs`);
   logger.info(`✨ Environment: ${ENV.NODE_ENV}`);
+
+  // Test Supabase/PostgreSQL connection and sync data
+  const connected = await testDatabaseConnection();
+  if (connected) {
+    await db.syncWithSupabase();
+  }
 });
 
 // Graceful shutdown handling

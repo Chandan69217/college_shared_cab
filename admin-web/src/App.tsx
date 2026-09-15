@@ -9,6 +9,7 @@ import { PickupPointsPage } from './pages/PickupPointsPage';
 import { RoutesPage } from './pages/RoutesPage';
 import { VehiclesPage } from './pages/VehiclesPage';
 import { DriversPage } from './pages/DriversPage';
+import { AssignmentsPage } from './pages/AssignmentsPage';
 import { PlansPage } from './pages/PlansPage';
 import { SubscriptionsPage } from './pages/SubscriptionsPage';
 import { BookingsPage } from './pages/BookingsPage';
@@ -18,6 +19,8 @@ import { ComplaintsPage } from './pages/ComplaintsPage';
 import { HolidaysPage } from './pages/HolidaysPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -44,6 +47,7 @@ export const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/"
             element={
@@ -53,12 +57,14 @@ export const App: React.FC = () => {
             }
           >
             <Route index element={<Dashboard />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="students" element={<StudentsPage />} />
             <Route path="colleges" element={<CollegesPage />} />
             <Route path="pickup-points" element={<PickupPointsPage />} />
             <Route path="routes" element={<RoutesPage />} />
             <Route path="vehicles" element={<VehiclesPage />} />
             <Route path="drivers" element={<DriversPage />} />
+            <Route path="assignments" element={<AssignmentsPage />} />
             <Route path="plans" element={<PlansPage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="bookings" element={<BookingsPage />} />

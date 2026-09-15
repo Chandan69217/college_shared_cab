@@ -1,11 +1,11 @@
-import { db } from '../database/db';
 import { Complaint, ComplaintCategory, ComplaintPriority, ComplaintStatus } from '../types';
 import { generateTicketNumber } from '../utils/crypto';
 import { NotificationProvider } from '../integrations/notificationProvider';
+import { ComplaintRepository } from '../repositories/complaintRepository';
 
 export class ComplaintService {
   /**
-   * Create a support ticket / complaint
+   * Create a support ticket / complaint in Supabase
    */
   public static async createComplaint(
     studentId: string,
@@ -16,40 +16,31 @@ export class ComplaintService {
       priority?: ComplaintPriority;
     }
   ): Promise<Complaint> {
-    const student = db.users.get(studentId);
-    const now = new Date().toISOString();
-    const id = `cmp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const ticketNumber = generateTicketNumber();
 
-    const complaint: Complaint = {
-      id,
+    const complaint = await ComplaintRepository.create({
       ticket_number: ticketNumber,
       student_id: studentId,
-      student,
       category: data.category,
       subject: data.subject,
       description: data.description,
       priority: data.priority || 'MEDIUM',
       status: 'OPEN',
-      created_at: now,
-      updated_at: now,
-    };
-
-    db.complaints.set(id, complaint);
+    });
 
     await NotificationProvider.send(
       studentId,
       'Support Ticket Created',
       `Ticket #${ticketNumber} has been logged under ${data.category}. We will respond within 24 hours.`,
       'GENERAL',
-      { ticketNumber, complaintId: id }
+      { ticketNumber, complaintId: complaint.id }
     );
 
     return complaint;
   }
 
   /**
-   * Admin response and resolution
+   * Admin response and resolution in Supabase
    */
   public static async replyComplaint(
     complaintId: string,
@@ -57,23 +48,7 @@ export class ComplaintService {
     response: string,
     status: ComplaintStatus = 'RESOLVED'
   ): Promise<Complaint> {
-    const complaint = db.complaints.get(complaintId);
-    if (!complaint) {
-      const err: any = new Error('Complaint not found.');
-      err.statusCode = 404;
-      err.code = 'COMPLAINT_NOT_FOUND';
-      throw err;
-    }
-
-    const now = new Date().toISOString();
-    complaint.admin_response = response;
-    complaint.status = status;
-    complaint.resolved_by = adminId;
-    if (status === 'RESOLVED' || status === 'CLOSED') {
-      complaint.resolved_at = now;
-    }
-    complaint.updated_at = now;
-    db.complaints.set(complaintId, complaint);
+    const complaint = await ComplaintRepository.updateStatus(complaintId, status, response, adminId);
 
     await NotificationProvider.send(
       complaint.student_id,

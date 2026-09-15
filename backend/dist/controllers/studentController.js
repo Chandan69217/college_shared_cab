@@ -2,8 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudentController = void 0;
 const studentService_1 = require("../services/studentService");
-const db_1 = require("../database/db");
 const response_1 = require("../utils/response");
+const bookingRepository_1 = require("../repositories/bookingRepository");
+const paymentRepository_1 = require("../repositories/paymentRepository");
+const supabaseClient_1 = require("../database/supabaseClient");
 class StudentController {
     static async getDashboard(req, res, next) {
         try {
@@ -28,14 +30,15 @@ class StudentController {
     static async getSubscriptions(req, res, next) {
         try {
             const studentId = req.user.userId;
-            const subscriptions = [];
-            for (const s of db_1.db.subscriptions.values()) {
-                if (s.student_id === studentId) {
-                    const plan = db_1.db.subscriptionPlans.get(s.plan_id);
-                    subscriptions.push({ ...s, plan });
-                }
-            }
-            (0, response_1.sendSuccess)(res, 'Subscriptions retrieved.', subscriptions);
+            const supabase = (0, supabaseClient_1.getSupabaseClient)();
+            const { data: subs, error } = await supabase
+                .from('subscriptions')
+                .select('*, plan:subscription_plans(*)')
+                .eq('student_id', studentId)
+                .order('created_at', { ascending: false });
+            if (error)
+                throw new Error(error.message);
+            (0, response_1.sendSuccess)(res, 'Subscriptions retrieved.', subs || []);
         }
         catch (err) {
             next(err);
@@ -44,16 +47,8 @@ class StudentController {
     static async getBookings(req, res, next) {
         try {
             const studentId = req.user.userId;
-            const bookings = [];
-            for (const b of db_1.db.bookings.values()) {
-                if (b.student_id === studentId) {
-                    const trip = db_1.db.trips.get(b.trip_id);
-                    const route = db_1.db.routes.get(b.route_id);
-                    const pickup = db_1.db.pickupPoints.get(b.pickup_point_id);
-                    bookings.push({ ...b, trip, route, pickup });
-                }
-            }
-            (0, response_1.sendSuccess)(res, 'Bookings retrieved.', bookings.reverse());
+            const bookings = await bookingRepository_1.BookingRepository.findByStudentId(studentId);
+            (0, response_1.sendSuccess)(res, 'Bookings retrieved.', bookings);
         }
         catch (err) {
             next(err);
@@ -62,15 +57,15 @@ class StudentController {
     static async getPasses(req, res, next) {
         try {
             const studentId = req.user.userId;
-            const passes = [];
-            for (const p of db_1.db.dailyPasses.values()) {
-                if (p.student_id === studentId) {
-                    const route = db_1.db.routes.get(p.route_id);
-                    const pickup = db_1.db.pickupPoints.get(p.pickup_point_id);
-                    passes.push({ ...p, route, pickup });
-                }
-            }
-            (0, response_1.sendSuccess)(res, 'Daily passes retrieved.', passes.reverse());
+            const supabase = (0, supabaseClient_1.getSupabaseClient)();
+            const { data: passes, error } = await supabase
+                .from('daily_travel_passes')
+                .select('*, trip:trips(*), route:routes(*), pickup_point:pickup_points(*)')
+                .eq('student_id', studentId)
+                .order('created_at', { ascending: false });
+            if (error)
+                throw new Error(error.message);
+            (0, response_1.sendSuccess)(res, 'Daily passes retrieved.', passes || []);
         }
         catch (err) {
             next(err);
@@ -79,13 +74,8 @@ class StudentController {
     static async getPayments(req, res, next) {
         try {
             const studentId = req.user.userId;
-            const payments = [];
-            for (const pay of db_1.db.payments.values()) {
-                if (pay.student_id === studentId) {
-                    payments.push(pay);
-                }
-            }
-            (0, response_1.sendSuccess)(res, 'Payment history retrieved.', payments.reverse());
+            const payments = await paymentRepository_1.PaymentRepository.findByStudentId(studentId);
+            (0, response_1.sendSuccess)(res, 'Payment history retrieved.', payments);
         }
         catch (err) {
             next(err);

@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/route_model.dart';
 import '../../../core/models/trip_model.dart';
@@ -63,7 +60,12 @@ class _BookRideScreenState extends State<BookRideScreen> {
   }
 
   Future<void> _handleBookRide() async {
-    if (_selectedTrip == null || _selectedPickup == null) return;
+    if (_selectedTrip == null || _selectedPickup == null) {
+      setState(() {
+        _errorMessage = 'Please select a valid pickup stop and trip slot.';
+      });
+      return;
+    }
 
     // Check geofence 10km limit
     if (_selectedPickup!.distanceToCollegeKm > 10.0 && !_selectedPickup!.isApproved) {
@@ -127,17 +129,9 @@ class _BookRideScreenState extends State<BookRideScreen> {
           ),
         );
       }
-    } on DioException catch (e) {
-      String msg = 'Failed to book ride.';
-      if (e.response?.data is Map && e.response?.data['message'] != null) {
-        msg = e.response!.data['message'].toString();
-      }
-      if (mounted) {
-        setState(() => _errorMessage = msg);
-      }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'An unexpected error occurred.');
+        setState(() => _errorMessage = ApiClient.getErrorMessage(e));
       }
     } finally {
       if (mounted) setState(() => _isBooking = false);
@@ -200,6 +194,7 @@ class _BookRideScreenState extends State<BookRideScreen> {
                         const SizedBox(height: 10),
                         DropdownButtonFormField<RouteModel>(
                           value: _selectedRoute,
+                          hint: const Text('No active routes found', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                           dropdownColor: AppColors.surface,
                           style: const TextStyle(color: Colors.white, fontSize: 13),
                           decoration: const InputDecoration(
@@ -250,6 +245,7 @@ class _BookRideScreenState extends State<BookRideScreen> {
                         const SizedBox(height: 10),
                         DropdownButtonFormField<PickupPointModel>(
                           value: _selectedPickup,
+                          hint: const Text('No pickup stops found', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                           dropdownColor: AppColors.surface,
                           style: const TextStyle(color: Colors.white, fontSize: 13),
                           decoration: const InputDecoration(
@@ -303,83 +299,92 @@ class _BookRideScreenState extends State<BookRideScreen> {
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(height: 10),
-                        ..._trips.map((trip) {
-                          final isSelected = _selectedTrip?.id == trip.id;
-                          final seatsLeft = trip.maxCapacity - trip.bookedSeats;
-                          final isFull = seatsLeft <= 0;
+                        if (_trips.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Text(
+                              'No scheduled trips available for booking currently.',
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                            ),
+                          )
+                        else
+                          ..._trips.map((trip) {
+                            final isSelected = _selectedTrip?.id == trip.id;
+                            final seatsLeft = trip.maxCapacity - trip.bookedSeats;
+                            final isFull = seatsLeft <= 0;
 
-                          return GestureDetector(
-                            onTap: isFull ? null : () => setState(() => _selectedTrip = trip),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.primary.withOpacity(0.12)
-                                    : AppColors.surface,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
+                            return GestureDetector(
+                              onTap: isFull ? null : () => setState(() => _selectedTrip = trip),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
                                   color: isSelected
-                                      ? AppColors.primary
-                                      : const Color(0xFF374151),
+                                      ? AppColors.primary.withOpacity(0.12)
+                                      : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : const Color(0xFF374151),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          trip.tripType == 'MORNING_PICKUP'
+                                              ? Icons.wb_sunny_outlined
+                                              : Icons.nightlight_round_outlined,
+                                          color: AppColors.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              trip.tripType == 'MORNING_PICKUP'
+                                                  ? 'Morning Commute (07:30 AM)'
+                                                  : 'Evening Return (05:00 PM)',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${trip.tripDate} • Capacity: ${trip.maxCapacity} Pax',
+                                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isFull
+                                            ? AppColors.accentRose.withOpacity(0.15)
+                                            : AppColors.primary.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        isFull ? 'FULL' : '$seatsLeft SEATS LEFT',
+                                        style: TextStyle(
+                                          color: isFull ? AppColors.accentRose : AppColors.primaryLight,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        trip.tripType == 'MORNING_PICKUP'
-                                            ? Icons.wb_sunny_outlined
-                                            : Icons.nightlight_round_outlined,
-                                        color: AppColors.primary,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            trip.tripType == 'MORNING_PICKUP'
-                                                ? 'Morning Commute (07:30 AM)'
-                                                : 'Evening Return (05:00 PM)',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          Text(
-                                            '${trip.tripDate} • Capacity: ${trip.maxCapacity} Pax',
-                                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isFull
-                                          ? AppColors.accentRose.withOpacity(0.15)
-                                          : AppColors.primary.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      isFull ? 'FULL' : '$seatsLeft SEATS LEFT',
-                                      style: TextStyle(
-                                        color: isFull ? AppColors.accentRose : AppColors.primaryLight,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          }).toList(),
                       ],
                     ),
                   ),

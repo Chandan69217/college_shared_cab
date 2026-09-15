@@ -1,7 +1,6 @@
-import { Payment, Subscription } from '../types';
 export declare class PaymentService {
     /**
-     * Initiate subscription purchase
+     * Initiate subscription purchase with real Supabase records
      */
     static initiateSubscriptionPayment(studentId: string, planId: string, paymentMethod?: 'UPI' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'NET_BANKING' | 'WALLET', autoRenew?: boolean): Promise<{
         paymentId: string;
@@ -9,14 +8,21 @@ export declare class PaymentService {
         gatewayOrderId: string;
         amount: number;
         currency: string;
-        receiptNumber: string;
         keyId: string;
+        receiptNumber: string;
     }>;
     /**
-     * Confirm and activate payment (Webhook or verified client callback)
+     * Verify and complete payment transaction in Supabase
      */
-    static confirmPayment(paymentId: string, gatewayPaymentId: string, signature: string): Promise<{
-        payment: Payment;
-        subscription: Subscription;
+    static verifyAndCompletePayment(studentId: string, data: {
+        gateway_order_id?: string;
+        gateway_payment_id: string;
+        gateway_signature: string;
+        payment_id?: string;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        payment: any;
     }>;
+    static getStudentPaymentHistory(studentId: string): Promise<import("../types").Payment[]>;
 }

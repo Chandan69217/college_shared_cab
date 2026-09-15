@@ -57,9 +57,15 @@ class _SupportScreenState extends State<SupportScreen> {
   }
 
   Future<void> _handleSubmitTicket() async {
-    if (_subjectController.text.trim().isEmpty || _descController.text.trim().isEmpty) {
+    if (_subjectController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields.')),
+        const SnackBar(content: Text('Subject is required.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    if (_descController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Description is required.'), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -84,7 +90,10 @@ class _SupportScreenState extends State<SupportScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit ticket.')),
+          SnackBar(
+            content: Text(ApiClient.getErrorMessage(e)),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {

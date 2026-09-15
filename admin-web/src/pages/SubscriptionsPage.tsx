@@ -5,39 +5,19 @@ import { api } from '../services/api';
 
 export const SubscriptionsPage: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // In demo, fetch student demo subscriptions
     const fetchSub = async () => {
       try {
-        const res = await api.get('/plans');
-        // Synthesize active subscription manifest for demo view
-        setSubscriptions([
-          {
-            id: 'sub-demo-1',
-            student_name: 'Aarav Sharma',
-            student_email: 'student1@college.edu',
-            plan_name: 'Standard Daily Commuter Pass',
-            rides_remaining: 38,
-            rides_allocated: 44,
-            start_date: '2026-09-01',
-            end_date: '2026-09-30',
-            status: 'ACTIVE',
-          },
-          {
-            id: 'sub-demo-2',
-            student_name: 'Rohan Gupta',
-            student_email: 'rohan.g@college.edu',
-            plan_name: 'Premium Unlimited Pass',
-            rides_remaining: 56,
-            rides_allocated: 60,
-            start_date: '2026-09-05',
-            end_date: '2026-10-04',
-            status: 'ACTIVE',
-          },
-        ]);
+        const res = await api.get('/admin/subscriptions');
+        const list = res.data?.data || [];
+        setSubscriptions(list);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch subscriptions:', err);
+        setSubscriptions([]);
+      } finally {
+        setLoading(false);
       }
     };
     fetchSub();
@@ -46,40 +26,49 @@ export const SubscriptionsPage: React.FC = () => {
   const columns: Column<any>[] = [
     {
       header: 'Student Name & Email',
-      accessor: (s) => (
-        <div>
-          <p className="font-semibold text-white">{s.student_name}</p>
-          <p className="text-[11px] text-slate-400">{s.student_email}</p>
-        </div>
-      ),
+      accessor: (s) => {
+        const name = s.student?.user?.full_name || s.student_name || 'N/A';
+        const email = s.student?.user?.email || s.student_email || 'N/A';
+        return (
+          <div>
+            <p className="font-semibold text-white">{name}</p>
+            <p className="text-[11px] text-slate-400">{email}</p>
+          </div>
+        );
+      },
     },
     {
       header: 'Subscribed Plan',
       accessor: (s) => (
-        <span className="font-semibold text-emerald-400">{s.plan_name}</span>
+        <span className="font-semibold text-emerald-400">{s.plan?.name || s.plan_name || 'Custom Plan'}</span>
       ),
     },
     {
       header: 'Ride Balance',
-      accessor: (s) => (
-        <div className="flex items-center gap-2">
-          <div className="w-24 bg-slate-800 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-emerald-500 h-full rounded-full"
-              style={{ width: `${(s.rides_remaining / s.rides_allocated) * 100}%` }}
-            />
+      accessor: (s) => {
+        const allocated = s.rides_allocated || s.plan?.total_rides || s.rides_remaining || 1;
+        const remaining = s.rides_remaining ?? 0;
+        const pct = Math.min(100, Math.max(0, (remaining / allocated) * 100));
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-24 bg-slate-800 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-emerald-500 h-full rounded-full"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-xs font-mono font-semibold text-white">
+              {remaining}/{allocated}
+            </span>
           </div>
-          <span className="text-xs font-mono font-semibold text-white">
-            {s.rides_remaining}/{s.rides_allocated}
-          </span>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Validity Period',
       accessor: (s) => (
         <span className="text-slate-300 text-xs font-mono">
-          {s.start_date} → {s.end_date}
+          {s.start_date || 'N/A'} → {s.end_date || 'N/A'}
         </span>
       ),
     },
@@ -87,7 +76,7 @@ export const SubscriptionsPage: React.FC = () => {
       header: 'Status',
       accessor: (s) => (
         <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-          <CheckCircle className="w-3 h-3" /> {s.status}
+          <CheckCircle className="w-3 h-3" /> {s.status || 'ACTIVE'}
         </span>
       ),
     },
@@ -104,11 +93,19 @@ export const SubscriptionsPage: React.FC = () => {
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={subscriptions}
-        searchFilter={(s, q) => s.student_name.toLowerCase().includes(q) || s.student_email.toLowerCase().includes(q)}
-      />
+      {loading ? (
+        <div className="p-12 text-center text-slate-400">Loading subscriptions...</div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={subscriptions}
+          searchFilter={(s, q) => {
+            const name = s.student?.user?.full_name || s.student_name || '';
+            const email = s.student?.user?.email || s.student_email || '';
+            return name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,29 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DriverService = void 0;
-const db_1 = require("../database/db");
+const userRepository_1 = require("../repositories/userRepository");
+const tripRepository_1 = require("../repositories/tripRepository");
 class DriverService {
     /**
      * Get driver dashboard with active trip, assigned vehicle, today's trips
      */
     static async getDriverDashboard(driverId) {
-        const user = db_1.db.users.get(driverId);
-        const profile = db_1.db.driverProfiles.get(driverId);
+        const user = await userRepository_1.UserRepository.findById(driverId);
+        const profile = await userRepository_1.UserRepository.getDriverProfile(driverId);
         const today = new Date().toISOString().split('T')[0];
-        const todayTrips = [];
+        const todayTrips = await tripRepository_1.TripRepository.findByDriverId(driverId, today);
         let activeTrip = null;
-        for (const trip of db_1.db.trips.values()) {
-            if (trip.driver_id === driverId && trip.trip_date === today) {
-                const route = db_1.db.routes.get(trip.route_id);
-                const vehicle = db_1.db.vehicles.get(trip.vehicle_id);
-                const hydratedTrip = { ...trip, route, vehicle };
-                todayTrips.push(hydratedTrip);
-                if (trip.status === 'IN_PROGRESS') {
-                    activeTrip = hydratedTrip;
-                }
+        for (const trip of todayTrips) {
+            if (trip.status === 'IN_PROGRESS') {
+                activeTrip = trip;
+                break;
             }
         }
-        // Default to first scheduled trip if none is in progress
         if (!activeTrip && todayTrips.length > 0) {
             activeTrip = todayTrips[0];
         }
@@ -44,7 +39,7 @@ class DriverService {
      * Get passengers manifest for a specific trip
      */
     static async getTripManifest(tripId, driverId) {
-        const trip = db_1.db.trips.get(tripId);
+        const trip = await tripRepository_1.TripRepository.findById(tripId);
         if (!trip) {
             const err = new Error('Trip not found.');
             err.statusCode = 404;
@@ -57,37 +52,13 @@ class DriverService {
             err.code = 'UNAUTHORIZED_DRIVER';
             throw err;
         }
-        const passengers = [];
-        for (const p of db_1.db.tripPassengers.values()) {
-            if (p.trip_id === tripId) {
-                const student = db_1.db.users.get(p.student_id);
-                const pickup = db_1.db.pickupPoints.get(p.pickup_point_id);
-                passengers.push({
-                    ...p,
-                    student: student
-                        ? {
-                            id: student.id,
-                            full_name: student.full_name,
-                            phone: student.phone,
-                            email: student.email,
-                            role: student.role,
-                            status: student.status,
-                            password_hash: '',
-                            created_at: student.created_at,
-                            updated_at: student.updated_at,
-                        }
-                        : undefined,
-                    pickup_point: pickup,
-                });
-            }
-        }
-        return passengers;
+        return tripRepository_1.TripRepository.getTripPassengers(tripId);
     }
     /**
      * Start Trip
      */
     static async startTrip(tripId, driverId) {
-        const trip = db_1.db.trips.get(tripId);
+        const trip = await tripRepository_1.TripRepository.findById(tripId);
         if (!trip) {
             const err = new Error('Trip not found.');
             err.statusCode = 404;
@@ -100,17 +71,16 @@ class DriverService {
             err.code = 'UNAUTHORIZED_DRIVER';
             throw err;
         }
-        trip.status = 'IN_PROGRESS';
-        trip.actual_start_time = new Date().toISOString();
-        trip.updated_at = new Date().toISOString();
-        db_1.db.trips.set(tripId, trip);
-        return trip;
+        return tripRepository_1.TripRepository.update(tripId, {
+            status: 'IN_PROGRESS',
+            actual_start_time: new Date().toISOString(),
+        });
     }
     /**
      * End Trip
      */
     static async endTrip(tripId, driverId) {
-        const trip = db_1.db.trips.get(tripId);
+        const trip = await tripRepository_1.TripRepository.findById(tripId);
         if (!trip) {
             const err = new Error('Trip not found.');
             err.statusCode = 404;
@@ -123,19 +93,10 @@ class DriverService {
             err.code = 'UNAUTHORIZED_DRIVER';
             throw err;
         }
-        trip.status = 'COMPLETED';
-        trip.actual_end_time = new Date().toISOString();
-        trip.updated_at = new Date().toISOString();
-        db_1.db.trips.set(tripId, trip);
-        // Update unboarded passengers to NO_SHOW
-        for (const [key, p] of db_1.db.tripPassengers.entries()) {
-            if (p.trip_id === tripId && p.status === 'WAITING') {
-                p.status = 'NO_SHOW';
-                p.updated_at = new Date().toISOString();
-                db_1.db.tripPassengers.set(key, p);
-            }
-        }
-        return trip;
+        return tripRepository_1.TripRepository.update(tripId, {
+            status: 'COMPLETED',
+            actual_end_time: new Date().toISOString(),
+        });
     }
 }
 exports.DriverService = DriverService;

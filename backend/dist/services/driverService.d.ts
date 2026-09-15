@@ -10,7 +10,7 @@ export declare class DriverService {
             phone: string | undefined;
             email: string | undefined;
         };
-        profile: import("../types").DriverProfile | undefined;
+        profile: import("../types").DriverProfile | null;
         activeTrip: any;
         todayTrips: Trip[];
         totalTripsToday: number;

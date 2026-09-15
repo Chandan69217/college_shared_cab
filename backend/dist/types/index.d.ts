@@ -137,8 +137,8 @@ export interface Route {
     morning_departure_time: string;
     evening_departure_time: string;
     estimated_duration_mins: number;
-    default_vehicle_id?: string;
-    default_driver_id?: string;
+    default_vehicle_id?: string | null;
+    default_driver_id?: string | null;
     max_capacity: number;
     is_active: boolean;
     stops?: RouteStop[];

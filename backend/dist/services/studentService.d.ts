@@ -1,7 +1,7 @@
 import { StudentProfile } from '../types';
 export declare class StudentService {
     /**
-     * Submit or update student verification documents
+     * Submit or update student verification documents in Supabase
      */
     static submitVerification(studentId: string, data: {
         student_id_number: string;
@@ -11,7 +11,7 @@ export declare class StudentService {
         id_card_url: string;
     }): Promise<StudentProfile>;
     /**
-     * Get student dashboard overview
+     * Get student dashboard overview from live Supabase tables
      */
     static getStudentDashboard(studentId: string): Promise<{
         user: {
@@ -21,10 +21,10 @@ export declare class StudentService {
             phone: string | undefined;
             role: "STUDENT" | "DRIVER" | "ADMIN" | undefined;
         };
-        profile: StudentProfile | undefined;
-        activeSubscription: any;
-        todaysBooking: any;
-        todaysPass: any;
+        profile: StudentProfile | null;
+        activeSubscription: import("../types").Subscription | null;
+        todaysBooking: import("../types").Booking | null;
+        todaysPass: import("../types").DailyTravelPass | null;
         unreadNotificationsCount: number;
     }>;
     /**

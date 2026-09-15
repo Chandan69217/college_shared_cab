@@ -20,8 +20,6 @@ class AppConstants {
     return 'http://127.0.0.1:5000/api/v1';
   }
 
-  static const String defaultCollegeId = '11111111-1111-1111-1111-111111111111';
-  
   // Storage keys
   static const String tokenKey = 'campus_ride_auth_token';
   static const String userKey = 'campus_ride_user_data';

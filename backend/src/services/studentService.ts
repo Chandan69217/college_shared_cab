@@ -1,10 +1,12 @@
-import { db } from '../database/db';
 import { NotificationProvider } from '../integrations/notificationProvider';
 import { StudentProfile } from '../types';
+import { UserRepository } from '../repositories/userRepository';
+import { SubscriptionRepository } from '../repositories/subscriptionRepository';
+import { BookingRepository } from '../repositories/bookingRepository';
 
 export class StudentService {
   /**
-   * Submit or update student verification documents
+   * Submit or update student verification documents in Supabase
    */
   public static async submitVerification(
     studentId: string,
@@ -16,23 +18,14 @@ export class StudentService {
       id_card_url: string;
     }
   ): Promise<StudentProfile> {
-    const profile = db.studentProfiles.get(studentId);
-    if (!profile) {
-      const err: any = new Error('Student profile not found.');
-      err.statusCode = 404;
-      err.code = 'PROFILE_NOT_FOUND';
-      throw err;
-    }
-
-    profile.student_id_number = data.student_id_number;
-    profile.roll_number = data.roll_number;
-    profile.course = data.course;
-    profile.semester = data.semester;
-    profile.id_card_url = data.id_card_url;
-    profile.verification_status = 'PENDING';
-    profile.updated_at = new Date().toISOString();
-
-    db.studentProfiles.set(studentId, profile);
+    const profile = await UserRepository.updateStudentProfile(studentId, {
+      student_id_number: data.student_id_number,
+      roll_number: data.roll_number,
+      course: data.course,
+      semester: data.semester,
+      id_card_url: data.id_card_url,
+      verification_status: 'PENDING',
+    });
 
     await NotificationProvider.send(
       studentId,
@@ -45,52 +38,21 @@ export class StudentService {
   }
 
   /**
-   * Get student dashboard overview
+   * Get student dashboard overview from live Supabase tables
    */
   public static async getStudentDashboard(studentId: string) {
-    const user = db.users.get(studentId);
-    const profile = db.studentProfiles.get(studentId);
+    const user = await UserRepository.findById(studentId);
+    const profile = await UserRepository.getStudentProfile(studentId);
     
     // Find active subscription
-    let activeSubscription: any = null;
-    for (const sub of db.subscriptions.values()) {
-      if (sub.student_id === studentId && sub.status === 'ACTIVE') {
-        const plan = db.subscriptionPlans.get(sub.plan_id);
-        activeSubscription = { ...sub, plan };
-        break;
-      }
-    }
+    const activeSubscription = await SubscriptionRepository.findActiveByStudentId(studentId);
 
-    // Find today's booking
+    // Find today's booking and pass
     const today = new Date().toISOString().split('T')[0];
-    let todaysBooking: any = null;
-    let todaysPass: any = null;
-
-    for (const b of db.bookings.values()) {
-      if (b.student_id === studentId && b.booking_date === today && b.status === 'CONFIRMED') {
-        const trip = db.trips.get(b.trip_id);
-        const route = db.routes.get(b.route_id);
-        const pickup = db.pickupPoints.get(b.pickup_point_id);
-        todaysBooking = { ...b, trip, route, pickup };
-        break;
-      }
-    }
-
+    const todaysBooking = await BookingRepository.findTodayBooking(studentId, today);
+    let todaysPass = null;
     if (todaysBooking) {
-      for (const p of db.dailyPasses.values()) {
-        if (p.booking_id === todaysBooking.id && (p.status === 'ACTIVE' || p.status === 'USED')) {
-          todaysPass = p;
-          break;
-        }
-      }
-    }
-
-    // Get recent notifications count
-    let unreadNotifs = 0;
-    for (const n of db.notifications.values()) {
-      if (n.user_id === studentId && !n.is_read) {
-        unreadNotifs++;
-      }
+      todaysPass = await BookingRepository.findDailyPass(todaysBooking.id);
     }
 
     return {
@@ -105,7 +67,7 @@ export class StudentService {
       activeSubscription,
       todaysBooking,
       todaysPass,
-      unreadNotificationsCount: unreadNotifs,
+      unreadNotificationsCount: 0,
     };
   }
 
@@ -116,9 +78,8 @@ export class StudentService {
     studentId: string,
     location?: { latitude: number; longitude: number }
   ) {
-    const user = db.users.get(studentId);
+    const user = await UserRepository.findById(studentId);
 
-    // Notify student confirmation
     await NotificationProvider.send(
       studentId,
       'SOS Alert Dispatched',
@@ -126,11 +87,10 @@ export class StudentService {
       'EMERGENCY'
     );
 
-    // Broadcast emergency notification to admins
     await NotificationProvider.broadcastToRole(
       'ALL',
       'EMERGENCY SOS ALERT',
-      `Student ${user?.full_name} (${user?.phone}) triggered an SOS emergency alert.`,
+      `Student ${user?.full_name || 'Unknown'} (${user?.phone || 'N/A'}) triggered an SOS emergency alert.`,
       'EMERGENCY'
     );
 

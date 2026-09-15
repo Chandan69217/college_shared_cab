@@ -55,22 +55,12 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             'authorized': false,
             'status': 'NOT_AUTHORIZED',
             'reason': 'VERIFICATION_ERROR',
-            'message': 'Failed to communicate with authentication server.',
+            'message': ApiClient.getErrorMessage(e),
           };
           _isVerifying = false;
         });
       }
     }
-  }
-
-  void _simulateScanValidPass() {
-    _tokenInputController.text = 'DEMO_HASH_AARAV';
-    _handleVerifyToken('DEMO_HASH_AARAV');
-  }
-
-  void _simulateScanAlreadyUsedPass() {
-    _tokenInputController.text = 'DEMO_HASH_AARAV';
-    _handleVerifyToken('DEMO_HASH_AARAV');
   }
 
   @override
@@ -139,38 +129,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            // One-Touch Simulation Bar
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _simulateScanValidPass,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primaryLight,
-                      side: const BorderSide(color: Color(0xFF374151)),
-                    ),
-                    icon: const Icon(Icons.check_circle_outline, size: 16),
-                    label: const Text('Simulate Valid Pass', style: TextStyle(fontSize: 11)),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _simulateScanAlreadyUsedPass,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.accentRose,
-                      side: const BorderSide(color: Color(0xFF374151)),
-                    ),
-                    icon: const Icon(Icons.replay_rounded, size: 16),
-                    label: const Text('Simulate Replay Scan', style: TextStyle(fontSize: 11)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
             // Token Input Field
             Row(
               children: [
@@ -180,7 +138,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
                     decoration: const InputDecoration(
                       labelText: 'Manual Pass Token Input',
-                      hintText: 'Enter base64 signed pass token',
+                      hintText: 'Enter dynamic student QR pass token',
                     ),
                   ),
                 ),
@@ -194,7 +152,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                           width: 16,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text('Verify'),
+                      : const Text('Verify Pass'),
                 ),
               ],
             ),
@@ -284,7 +242,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               children: [
                 const Text('Passenger Name:', style: TextStyle(color: Colors.white70, fontSize: 12)),
                 Text(
-                  result['student']?['full_name'] ?? 'Aarav Sharma',
+                  result['student']?['full_name'] ?? 'Passenger',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ],
@@ -295,7 +253,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               children: [
                 const Text('Student ID:', style: TextStyle(color: Colors.white70, fontSize: 12)),
                 Text(
-                  result['student']?['student_id_number'] ?? 'STU-2024-042',
+                  result['student']?['student_id_number'] ?? 'N/A',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace'),
                 ),
               ],

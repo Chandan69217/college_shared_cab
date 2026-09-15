@@ -12,10 +12,12 @@ import paymentRoutes from './paymentRoutes';
 import complaintRoutes from './complaintRoutes';
 import reportRoutes from './reportRoutes';
 import holidayRoutes from './holidayRoutes';
+import profileRoutes from './profileRoutes';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/profile', profileRoutes);
 router.use('/students', studentRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/admin', adminRoutes);

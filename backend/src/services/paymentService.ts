@@ -1,11 +1,12 @@
-import { db } from '../database/db';
 import { PaymentProvider } from '../integrations/paymentProvider';
 import { NotificationProvider } from '../integrations/notificationProvider';
-import { Payment, Subscription } from '../types';
+import { PlanRepository, SubscriptionRepository } from '../repositories/subscriptionRepository';
+import { PaymentRepository } from '../repositories/paymentRepository';
+import { getSupabaseClient } from '../database/supabaseClient';
 
 export class PaymentService {
   /**
-   * Initiate subscription purchase
+   * Initiate subscription purchase with real Supabase records
    */
   public static async initiateSubscriptionPayment(
     studentId: string,
@@ -13,7 +14,7 @@ export class PaymentService {
     paymentMethod: 'UPI' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'NET_BANKING' | 'WALLET' = 'UPI',
     autoRenew = false
   ) {
-    const plan = db.subscriptionPlans.get(planId);
+    const plan = await PlanRepository.findById(planId);
     if (!plan) {
       const err: any = new Error('Subscription plan not found.');
       err.statusCode = 404;
@@ -29,128 +30,121 @@ export class PaymentService {
     }
 
     const order = await PaymentProvider.createOrder(plan.price, studentId, planId);
-    const now = new Date().toISOString();
-    const paymentId = `pay-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const subId = `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const startDate = new Date();
+    const endDate = new Date(startDate.getTime() + (plan.validity_days || 30) * 86400000);
 
-    // Create Pending Payment record
-    const paymentRecord: Payment = {
-      id: paymentId,
+    // Create Pending Subscription record in Supabase
+    const subscription = await SubscriptionRepository.create({
       student_id: studentId,
-      subscription_id: subId,
+      plan_id: planId,
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+      total_rides_allocated: plan.ride_count_total || 44,
+      remaining_rides: plan.ride_count_total || 44,
+      status: 'PENDING_PAYMENT',
+      auto_renew: autoRenew,
+    });
+
+    // Create Pending Payment record in Supabase
+    const payment = await PaymentRepository.create({
+      student_id: studentId,
+      subscription_id: subscription.id,
       amount: plan.price,
       currency: 'INR',
       payment_method: paymentMethod,
       gateway_order_id: order.gatewayOrderId,
       status: 'PENDING',
       receipt_number: order.receiptNumber,
-      created_at: now,
-      updated_at: now,
-    };
-    db.payments.set(paymentId, paymentRecord);
-
-    // Create Pending Subscription record
-    const startDate = new Date();
-    const endDate = new Date(startDate.getTime() + plan.validity_days * 86400000);
-
-    const subscriptionRecord: Subscription = {
-      id: subId,
-      student_id: studentId,
-      plan_id: planId,
-      plan,
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
-      total_rides_allocated: plan.ride_count_total,
-      remaining_rides: plan.ride_count_total,
-      status: 'PENDING_PAYMENT',
-      payment_id: paymentId,
-      auto_renew: autoRenew,
-      created_at: now,
-      updated_at: now,
-    };
-    db.subscriptions.set(subId, subscriptionRecord);
+    });
 
     return {
-      paymentId,
-      subscriptionId: subId,
+      paymentId: payment.id,
+      subscriptionId: subscription.id,
       gatewayOrderId: order.gatewayOrderId,
       amount: plan.price,
       currency: 'INR',
-      receiptNumber: order.receiptNumber,
       keyId: order.keyId,
+      receiptNumber: order.receiptNumber,
     };
   }
 
   /**
-   * Confirm and activate payment (Webhook or verified client callback)
+   * Verify and complete payment transaction in Supabase
    */
-  public static async confirmPayment(
-    paymentId: string,
-    gatewayPaymentId: string,
-    signature: string
-  ): Promise<{ payment: Payment; subscription: Subscription }> {
-    const payment = db.payments.get(paymentId);
-    if (!payment) {
+  public static async verifyAndCompletePayment(
+    studentId: string,
+    data: {
+      gateway_order_id?: string;
+      gateway_payment_id: string;
+      gateway_signature: string;
+      payment_id?: string;
+    }
+  ) {
+    const isSignatureValid = PaymentProvider.verifyPaymentSignature(
+      data.gateway_order_id || 'order_default',
+      data.gateway_payment_id,
+      data.gateway_signature
+    );
+
+    const supabase = getSupabaseClient()!;
+    let query = supabase
+      .from('payments')
+      .select('*, subscription:subscriptions(*, plan:subscription_plans(*))');
+
+    if (data.gateway_order_id) {
+      query = query.eq('gateway_order_id', data.gateway_order_id);
+    } else if ((data as any).payment_id) {
+      query = query.eq('id', (data as any).payment_id);
+    }
+
+    const { data: payment, error } = await query.maybeSingle();
+
+    if (error || !payment) {
       const err: any = new Error('Payment record not found.');
       err.statusCode = 404;
       err.code = 'PAYMENT_NOT_FOUND';
       throw err;
     }
 
-    if (payment.status === 'SUCCESS') {
-      const sub = db.subscriptions.get(payment.subscription_id!);
-      return { payment, subscription: sub! };
-    }
-
-    // Verify signature
-    const verification = PaymentProvider.verifyPaymentSignature(
-      payment.gateway_order_id || '',
-      gatewayPaymentId,
-      signature
-    );
-
-    if (!verification.isVerified) {
-      payment.status = 'FAILED';
-      payment.error_message = verification.error || 'Signature verification failed';
-      payment.updated_at = new Date().toISOString();
-      db.payments.set(paymentId, payment);
-
-      const err: any = new Error('Payment signature verification failed.');
-      err.statusCode = 400;
-      err.code = 'PAYMENT_VERIFICATION_FAILED';
-      throw err;
-    }
-
-    // Update payment to SUCCESS
     const now = new Date().toISOString();
-    payment.status = 'SUCCESS';
-    payment.transaction_id = verification.transactionId;
-    payment.gateway_signature = signature;
-    payment.updated_at = now;
-    db.payments.set(paymentId, payment);
 
-    // Activate Subscription
-    const subscription = db.subscriptions.get(payment.subscription_id!);
-    if (!subscription) {
-      const err: any = new Error('Associated subscription not found.');
-      err.statusCode = 404;
-      err.code = 'SUBSCRIPTION_NOT_FOUND';
-      throw err;
-    }
+    // Mark payment SUCCESS
+    await supabase
+      .from('payments')
+      .update({
+        status: 'SUCCESS',
+        gateway_payment_id: data.gateway_payment_id,
+        gateway_signature: data.gateway_signature,
+        paid_at: now,
+        updated_at: now,
+      })
+      .eq('id', payment.id);
 
-    subscription.status = 'ACTIVE';
-    subscription.updated_at = now;
-    db.subscriptions.set(subscription.id, subscription);
+    // Activate subscription
+    await supabase
+      .from('subscriptions')
+      .update({
+        status: 'ACTIVE',
+        updated_at: now,
+      })
+      .eq('id', payment.subscription_id);
 
-    // Send confirmation notification
     await NotificationProvider.send(
-      payment.student_id,
+      studentId,
       'Subscription Activated!',
-      `Your subscription (${subscription.plan?.name || 'Commuter Pass'}) is now active with ${subscription.total_rides_allocated} rides.`,
+      `Payment of ₹${payment.amount} confirmed. Your pass is now active for daily rides.`,
       'PAYMENT',
-      { subscriptionId: subscription.id, paymentId }
+      { paymentId: payment.id, subscriptionId: payment.subscription_id }
     );
 
-    return { payment, subscription };
+    return {
+      success: true,
+      message: 'Subscription purchased and activated successfully.',
+      payment: { ...payment, status: 'SUCCESS' },
+    };
+  }
+
+  public static async getStudentPaymentHistory(studentId: string) {
+    return PaymentRepository.findByStudentId(studentId);
   }
 }

@@ -1,21 +1,21 @@
-import { db } from '../database/db';
 import { CollegeHoliday } from '../types';
+import { HolidayRepository } from '../repositories/holidayRepository';
 
 export class HolidayService {
   /**
-   * Check if a given date is a non-service holiday
+   * Check if a given date is a non-service holiday in Supabase
    */
   public static async isHoliday(collegeId: string, dateStr: string): Promise<{ isHoliday: boolean; holiday?: CollegeHoliday }> {
-    for (const holiday of db.holidays.values()) {
-      if (holiday.college_id === collegeId && holiday.holiday_date === dateStr && holiday.is_service_disabled) {
-        return { isHoliday: true, holiday };
-      }
+    const holidays = await HolidayRepository.findAll(collegeId);
+    const matched = holidays.find((h) => h.holiday_date === dateStr && h.is_service_disabled);
+    if (matched) {
+      return { isHoliday: true, holiday: matched };
     }
     return { isHoliday: false };
   }
 
   /**
-   * Add a college holiday
+   * Add a college holiday in Supabase
    */
   public static async addHoliday(data: {
     college_id: string;
@@ -24,18 +24,12 @@ export class HolidayService {
     holiday_type: 'COLLEGE_HOLIDAY' | 'EXAM_HOLIDAY' | 'SUNDAY' | 'SPECIAL';
     is_service_disabled: boolean;
   }): Promise<CollegeHoliday> {
-    const id = `hol-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const holiday: CollegeHoliday = {
-      id,
+    return HolidayRepository.create({
       college_id: data.college_id,
       holiday_date: data.holiday_date,
       title: data.title,
       holiday_type: data.holiday_type,
       is_service_disabled: data.is_service_disabled,
-      created_at: new Date().toISOString(),
-    };
-
-    db.holidays.set(id, holiday);
-    return holiday;
+    });
   }
 }

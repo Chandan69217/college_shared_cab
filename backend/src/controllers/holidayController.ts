@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { db } from '../database/db';
+import { HolidayRepository } from '../repositories/holidayRepository';
 import { HolidayService } from '../services/holidayService';
 import { createHolidaySchema } from '../validators/schemas';
 import { sendSuccess } from '../utils/response';
@@ -8,10 +8,7 @@ export class HolidayController {
   public static async getHolidays(req: Request, res: Response, next: NextFunction) {
     try {
       const collegeId = req.query.college_id as string;
-      let holidays = Array.from(db.holidays.values());
-      if (collegeId) {
-        holidays = holidays.filter((h) => h.college_id === collegeId);
-      }
+      const holidays = await HolidayRepository.findAll(collegeId);
       sendSuccess(res, 'College holidays retrieved.', holidays);
     } catch (err) {
       next(err);

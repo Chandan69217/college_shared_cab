@@ -2,9 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ComplaintController = void 0;
 const complaintService_1 = require("../services/complaintService");
+const complaintRepository_1 = require("../repositories/complaintRepository");
+const tripRepository_1 = require("../repositories/tripRepository");
 const schemas_1 = require("../validators/schemas");
 const response_1 = require("../utils/response");
-const db_1 = require("../database/db");
+const supabaseClient_1 = require("../database/supabaseClient");
 class ComplaintController {
     static async createComplaint(req, res, next) {
         try {
@@ -32,9 +34,7 @@ class ComplaintController {
     static async getStudentComplaints(req, res, next) {
         try {
             const studentId = req.user.userId;
-            const list = Array.from(db_1.db.complaints.values())
-                .filter((c) => c.student_id === studentId)
-                .reverse();
+            const list = await complaintRepository_1.ComplaintRepository.findByStudentId(studentId);
             (0, response_1.sendSuccess)(res, 'Complaints retrieved.', list);
         }
         catch (err) {
@@ -43,7 +43,7 @@ class ComplaintController {
     }
     static async getAllComplaints(req, res, next) {
         try {
-            const list = Array.from(db_1.db.complaints.values()).reverse();
+            const list = await complaintRepository_1.ComplaintRepository.findAll();
             (0, response_1.sendSuccess)(res, 'All complaints retrieved.', list);
         }
         catch (err) {
@@ -54,25 +54,27 @@ class ComplaintController {
         try {
             const studentId = req.user.userId;
             const validated = schemas_1.rateTripSchema.parse(req.body);
-            const trip = db_1.db.trips.get(validated.trip_id);
+            const trip = await tripRepository_1.TripRepository.findById(validated.trip_id);
             if (!trip) {
                 const err = new Error('Trip not found.');
                 err.statusCode = 404;
                 err.code = 'TRIP_NOT_FOUND';
                 throw err;
             }
-            const ratingId = `rat-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-            const rating = {
-                id: ratingId,
-                trip_id: validated.trip_id,
-                student_id: studentId,
-                driver_id: trip.driver_id,
-                rating_stars: validated.rating_stars,
-                feedback_text: validated.feedback_text,
-                tags: validated.tags,
-                created_at: new Date().toISOString(),
-            };
-            db_1.db.ratings.set(ratingId, rating);
+            const supabase = (0, supabaseClient_1.getSupabaseClient)();
+            const { data: rating, error } = await supabase
+                .from('driver_ratings')
+                .insert([{
+                    trip_id: validated.trip_id,
+                    student_id: studentId,
+                    driver_id: trip.driver_id,
+                    rating: validated.rating_stars,
+                    comment: validated.feedback_text,
+                }])
+                .select('*')
+                .single();
+            if (error)
+                throw new Error(error.message);
             (0, response_1.sendSuccess)(res, 'Thank you for your rating!', rating, 201);
         }
         catch (err) {

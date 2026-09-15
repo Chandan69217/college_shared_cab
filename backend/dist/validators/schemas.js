@@ -1,18 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createHolidaySchema = exports.rateTripSchema = exports.replyComplaintSchema = exports.createComplaintSchema = exports.updateGpsLocationSchema = exports.verifyQrScanSchema = exports.cancelBookingSchema = exports.createBookingSchema = exports.subscribePlanSchema = exports.createPlanSchema = exports.createVehicleSchema = exports.createRouteSchema = exports.createPickupPointSchema = exports.verifyOtpSchema = exports.requestOtpSchema = exports.loginSchema = exports.registerStudentSchema = void 0;
+exports.updateAdminProfileSchema = exports.createAdminProfileSchema = exports.createAdminSchema = exports.createHolidaySchema = exports.rateTripSchema = exports.replyComplaintSchema = exports.createComplaintSchema = exports.updateGpsLocationSchema = exports.verifyQrScanSchema = exports.cancelBookingSchema = exports.createBookingSchema = exports.subscribePlanSchema = exports.createPlanSchema = exports.createVehicleSchema = exports.createRouteSchema = exports.createPickupPointSchema = exports.updateProfileSchema = exports.resetPasswordSchema = exports.verifyRecoveryOtpSchema = exports.forgotPasswordSchema = exports.changePasswordSchema = exports.verifyOtpSchema = exports.requestOtpSchema = exports.loginSchema = exports.registerStudentSchema = void 0;
 const zod_1 = require("zod");
-exports.registerStudentSchema = zod_1.z.object({
+exports.registerStudentSchema = zod_1.z
+    .object({
     email: zod_1.z.string().email(),
     phone: zod_1.z.string().min(10).max(15),
     full_name: zod_1.z.string().min(2).max(150),
     password: zod_1.z.string().min(6).max(100),
-    college_id: zod_1.z.string().uuid(),
+    college_id: zod_1.z.string().uuid().optional(),
+    college_code: zod_1.z.string().min(2).max(50).optional(),
     student_id_number: zod_1.z.string().min(2).max(100),
     roll_number: zod_1.z.string().optional(),
     course: zod_1.z.string().min(2).max(150),
     semester: zod_1.z.number().int().min(1).max(12),
     id_card_url: zod_1.z.string().url().optional(),
+})
+    .refine((data) => data.college_id || data.college_code, {
+    message: 'Either college_code or college_id must be provided for registration.',
+    path: ['college_code'],
 });
 exports.loginSchema = zod_1.z.object({
     emailOrPhone: zod_1.z.string().min(3),
@@ -25,6 +31,92 @@ exports.requestOtpSchema = zod_1.z.object({
 exports.verifyOtpSchema = zod_1.z.object({
     phone: zod_1.z.string().min(10).max(15),
     otp: zod_1.z.string().length(6),
+});
+exports.changePasswordSchema = zod_1.z
+    .object({
+    currentPassword: zod_1.z.string().min(1, 'Current password is required.'),
+    newPassword: zod_1.z
+        .string()
+        .min(8, 'New password must be at least 8 characters long.')
+        .regex(/[A-Z]/, 'New password must contain at least one uppercase letter.')
+        .regex(/[a-z]/, 'New password must contain at least one lowercase letter.')
+        .regex(/[0-9]/, 'New password must contain at least one number.')
+        .regex(/[^A-Za-z0-9]/, 'New password must contain at least one special character.'),
+    confirmPassword: zod_1.z.string().min(1, 'Password confirmation is required.'),
+})
+    .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'New password and confirm password do not match.',
+    path: ['confirmPassword'],
+})
+    .refine((data) => data.currentPassword !== data.newPassword, {
+    message: 'New password cannot be the same as the current password.',
+    path: ['newPassword'],
+});
+exports.forgotPasswordSchema = zod_1.z
+    .object({
+    identifier: zod_1.z.string().min(3).optional(),
+    emailOrPhone: zod_1.z.string().min(3).optional(),
+    email: zod_1.z.string().optional(),
+    phone: zod_1.z.string().optional(),
+    role: zod_1.z.enum(['STUDENT', 'DRIVER', 'ADMIN']).optional(),
+})
+    .refine((data) => data.identifier || data.emailOrPhone || data.email || data.phone, {
+    message: 'Please enter your registered email address or mobile number.',
+    path: ['identifier'],
+});
+exports.verifyRecoveryOtpSchema = zod_1.z
+    .object({
+    identifier: zod_1.z.string().min(3).optional(),
+    emailOrPhone: zod_1.z.string().min(3).optional(),
+    otp: zod_1.z
+        .string()
+        .length(6, 'OTP must be exactly 6 digits.')
+        .regex(/^\d{6}$/, 'OTP must contain digits only.'),
+    purpose: zod_1.z.enum(['PASSWORD_RESET', 'LOGIN', 'VERIFICATION']).default('PASSWORD_RESET'),
+    role: zod_1.z.enum(['STUDENT', 'DRIVER', 'ADMIN']).optional(),
+})
+    .refine((data) => data.identifier || data.emailOrPhone, {
+    message: 'Email address or mobile number is required.',
+    path: ['identifier'],
+});
+exports.resetPasswordSchema = zod_1.z
+    .object({
+    identifier: zod_1.z.string().min(3).optional(),
+    emailOrPhone: zod_1.z.string().min(3).optional(),
+    resetToken: zod_1.z.string().min(10, 'Valid password reset token is required.'),
+    role: zod_1.z.enum(['STUDENT', 'DRIVER', 'ADMIN']).optional(),
+    newPassword: zod_1.z
+        .string()
+        .min(8, 'New password must be at least 8 characters long.')
+        .regex(/[A-Z]/, 'New password must contain at least one uppercase letter.')
+        .regex(/[a-z]/, 'New password must contain at least one lowercase letter.')
+        .regex(/[0-9]/, 'New password must contain at least one number.')
+        .regex(/[^A-Za-z0-9]/, 'New password must contain at least one special character.'),
+    confirmPassword: zod_1.z.string().min(1, 'Password confirmation is required.'),
+})
+    .refine((data) => data.identifier || data.emailOrPhone, {
+    message: 'Email address or mobile number is required.',
+    path: ['identifier'],
+})
+    .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'New password and confirm password do not match.',
+    path: ['confirmPassword'],
+});
+exports.updateProfileSchema = zod_1.z.object({
+    full_name: zod_1.z.string().min(2, 'Full name must be at least 2 characters.').max(150).optional(),
+    phone: zod_1.z.string().min(10, 'Phone must be at least 10 digits.').max(15).optional(),
+    email: zod_1.z.string().email('Invalid email address format.').optional(),
+    profile_photo_url: zod_1.z.string().url('Invalid photo URL.').or(zod_1.z.literal('')).optional(),
+    address: zod_1.z.string().max(300).optional(),
+    // Student fields
+    course: zod_1.z.string().max(150).optional(),
+    semester: zod_1.z.number().int().min(1).max(12).optional(),
+    student_id_number: zod_1.z.string().max(100).optional(),
+    roll_number: zod_1.z.string().max(100).optional(),
+    // Driver fields
+    license_number: zod_1.z.string().max(100).optional(),
+    // Admin fields
+    department: zod_1.z.string().max(100).optional(),
 });
 exports.createPickupPointSchema = zod_1.z.object({
     college_id: zod_1.z.string().uuid(),
@@ -136,5 +228,24 @@ exports.createHolidaySchema = zod_1.z.object({
     title: zod_1.z.string().min(2).max(200),
     holiday_type: zod_1.z.enum(['COLLEGE_HOLIDAY', 'EXAM_HOLIDAY', 'SUNDAY', 'SPECIAL']).default('COLLEGE_HOLIDAY'),
     is_service_disabled: zod_1.z.boolean().default(true),
+});
+exports.createAdminSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+    phone: zod_1.z.string().min(10).max(15),
+    full_name: zod_1.z.string().min(2).max(150),
+    password: zod_1.z.string().min(6).max(100),
+    department: zod_1.z.string().min(2).max(100).default('Operations'),
+    permissions: zod_1.z.array(zod_1.z.string()).default(['ALL']),
+});
+exports.createAdminProfileSchema = zod_1.z.object({
+    user_id: zod_1.z.string().uuid().optional(),
+    full_name: zod_1.z.string().min(2).max(150).optional(),
+    department: zod_1.z.string().min(2).max(100).default('Operations'),
+    permissions: zod_1.z.array(zod_1.z.string()).default(['ALL']),
+});
+exports.updateAdminProfileSchema = zod_1.z.object({
+    full_name: zod_1.z.string().min(2).max(150).optional(),
+    department: zod_1.z.string().min(2).max(100).optional(),
+    permissions: zod_1.z.array(zod_1.z.string()).optional(),
 });
 //# sourceMappingURL=schemas.js.map

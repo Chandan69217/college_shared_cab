@@ -1,7 +1,7 @@
 import { NotificationType } from '../types';
 export declare class NotificationProvider {
     /**
-     * Sends in-app and simulated push notification
+     * Sends in-app and simulated push notification to Supabase notifications table
      */
     static send(userId: string, title: string, message: string, type: NotificationType, data?: Record<string, any>): Promise<void>;
     /**

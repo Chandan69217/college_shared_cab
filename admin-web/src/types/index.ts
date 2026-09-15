@@ -6,6 +6,7 @@ export interface User {
   role: 'STUDENT' | 'DRIVER' | 'ADMIN';
   status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
   profile?: any;
+  college?: College;
   created_at: string;
 }
 
@@ -16,9 +17,24 @@ export interface StudentProfile {
   roll_number?: string;
   course: string;
   semester: number;
+  id_card_url?: string;
   verification_status: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
   verification_notes?: string;
   verified_at?: string;
+  verified_by?: string;
+}
+
+export interface DriverProfile {
+  id: string;
+  college_id: string;
+  license_number: string;
+  license_expiry: string;
+  aadhar_number?: string;
+  experience_years: number;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'ON_LEAVE';
+  rating_avg: number;
+  total_trips: number;
+  documents?: Record<string, any>;
 }
 
 export interface College {
@@ -56,6 +72,10 @@ export interface Route {
   morning_departure_time: string;
   evening_departure_time: string;
   estimated_duration_mins: number;
+  default_vehicle_id?: string | null;
+  default_driver_id?: string | null;
+  default_vehicle?: Vehicle | null;
+  default_driver?: User | null;
   max_capacity: number;
   is_active: boolean;
   stops?: any[];
@@ -72,6 +92,8 @@ export interface Vehicle {
   insurance_validity: string;
   fitness_validity: string;
   status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SubscriptionPlan {
@@ -129,12 +151,57 @@ export interface Complaint {
 
 export interface DashboardStats {
   totalStudents: number;
-  activeSubscriptions: number;
-  todaysTrips: number;
-  activeVehicles: number;
+  activeStudents?: number;
+  verifiedStudents?: number;
+  pendingVerifications: number;
+  totalDrivers?: number;
   activeDrivers: number;
+  onLeaveDrivers?: number;
+  totalVehicles?: number;
+  activeVehicles: number;
+  maintenanceVehicles?: number;
+  totalRoutes?: number;
+  activeRoutes?: number;
+  assignedVehiclesCount?: number;
+  assignedDriversCount?: number;
+  todaysTrips: number;
+  activeTrips?: number;
   todayRevenue: number;
   totalRevenue: number;
   averageOccupancy: number;
-  pendingVerifications: number;
+  activeSubscriptions: number;
+}
+
+export interface RouteAssignment {
+  id?: string;
+  routeId: string;
+  routeName: string;
+  routeCode: string;
+  morningDeparture: string;
+  eveningDeparture: string;
+  assignedVehicle: {
+    id: string;
+    vehicleNumber: string;
+    model: string;
+    type: string;
+    seatingCapacity: number;
+    status: string;
+  } | null;
+  assignedDriver: {
+    id: string;
+    fullName: string;
+    phone: string;
+    licenseNumber?: string;
+    status?: string;
+  } | null;
+  capacity: number;
+  activeBookingsCount: number;
+  isCapacityReached: boolean;
+  status: string;
+}
+
+export interface AssignmentsSummary {
+  routes: RouteAssignment[];
+  availableVehicles: Vehicle[];
+  availableDrivers: User[];
 }

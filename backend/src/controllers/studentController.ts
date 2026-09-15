@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { StudentService } from '../services/studentService';
-import { db } from '../database/db';
-import { sendSuccess, sendError } from '../utils/response';
+import { sendSuccess } from '../utils/response';
+import { BookingRepository } from '../repositories/bookingRepository';
+import { PaymentRepository } from '../repositories/paymentRepository';
+import { SubscriptionRepository } from '../repositories/subscriptionRepository';
+import { getSupabaseClient } from '../database/supabaseClient';
 
 export class StudentController {
   public static async getDashboard(req: Request, res: Response, next: NextFunction) {
@@ -27,14 +30,15 @@ export class StudentController {
   public static async getSubscriptions(req: Request, res: Response, next: NextFunction) {
     try {
       const studentId = req.user!.userId;
-      const subscriptions: any[] = [];
-      for (const s of db.subscriptions.values()) {
-        if (s.student_id === studentId) {
-          const plan = db.subscriptionPlans.get(s.plan_id);
-          subscriptions.push({ ...s, plan });
-        }
-      }
-      sendSuccess(res, 'Subscriptions retrieved.', subscriptions);
+      const supabase = getSupabaseClient()!;
+      const { data: subs, error } = await supabase
+        .from('subscriptions')
+        .select('*, plan:subscription_plans(*)')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(error.message);
+      sendSuccess(res, 'Subscriptions retrieved.', subs || []);
     } catch (err) {
       next(err);
     }
@@ -43,16 +47,8 @@ export class StudentController {
   public static async getBookings(req: Request, res: Response, next: NextFunction) {
     try {
       const studentId = req.user!.userId;
-      const bookings: any[] = [];
-      for (const b of db.bookings.values()) {
-        if (b.student_id === studentId) {
-          const trip = db.trips.get(b.trip_id);
-          const route = db.routes.get(b.route_id);
-          const pickup = db.pickupPoints.get(b.pickup_point_id);
-          bookings.push({ ...b, trip, route, pickup });
-        }
-      }
-      sendSuccess(res, 'Bookings retrieved.', bookings.reverse());
+      const bookings = await BookingRepository.findByStudentId(studentId);
+      sendSuccess(res, 'Bookings retrieved.', bookings);
     } catch (err) {
       next(err);
     }
@@ -61,15 +57,15 @@ export class StudentController {
   public static async getPasses(req: Request, res: Response, next: NextFunction) {
     try {
       const studentId = req.user!.userId;
-      const passes: any[] = [];
-      for (const p of db.dailyPasses.values()) {
-        if (p.student_id === studentId) {
-          const route = db.routes.get(p.route_id);
-          const pickup = db.pickupPoints.get(p.pickup_point_id);
-          passes.push({ ...p, route, pickup });
-        }
-      }
-      sendSuccess(res, 'Daily passes retrieved.', passes.reverse());
+      const supabase = getSupabaseClient()!;
+      const { data: passes, error } = await supabase
+        .from('daily_travel_passes')
+        .select('*, trip:trips(*), route:routes(*), pickup_point:pickup_points(*)')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(error.message);
+      sendSuccess(res, 'Daily passes retrieved.', passes || []);
     } catch (err) {
       next(err);
     }
@@ -78,13 +74,8 @@ export class StudentController {
   public static async getPayments(req: Request, res: Response, next: NextFunction) {
     try {
       const studentId = req.user!.userId;
-      const payments: any[] = [];
-      for (const pay of db.payments.values()) {
-        if (pay.student_id === studentId) {
-          payments.push(pay);
-        }
-      }
-      sendSuccess(res, 'Payment history retrieved.', payments.reverse());
+      const payments = await PaymentRepository.findByStudentId(studentId);
+      sendSuccess(res, 'Payment history retrieved.', payments);
     } catch (err) {
       next(err);
     }

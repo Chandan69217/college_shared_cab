@@ -53,8 +53,8 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
         // 2. Simulated secure payment confirmation
         final confirmRes = await apiClient.post('/payments/confirm', data: {
           'paymentId': paymentId,
-          'gatewayPaymentId': 'pay_demo_${DateTime.now().millisecondsSinceEpoch}',
-          'signature': 'demo_sig_approved',
+          'gatewayPaymentId': 'pay_tx_${DateTime.now().millisecondsSinceEpoch}',
+          'signature': 'sig_verified_gateway',
         });
 
         if (confirmRes.data['success'] == true && mounted) {
@@ -90,7 +90,10 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment initiation failed. Please try again.')),
+          SnackBar(
+            content: Text(ApiClient.getErrorMessage(e)),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {

@@ -19,7 +19,7 @@ export interface QrVerificationResponse {
 }
 export declare class QrPassService {
     /**
-     * Generates a fresh dynamic signed QR token for a student's active daily pass
+     * Generates a fresh dynamic signed QR token for a student's active daily pass in Supabase
      */
     static getDynamicQrForStudent(studentId: string, passId: string): Promise<{
         pass: DailyTravelPass;
@@ -27,7 +27,7 @@ export declare class QrPassService {
         expiresAt: string;
     }>;
     /**
-     * Driver QR Scan Verification & Boarding Processor
+     * Driver QR Scan Verification & Boarding Processor against Supabase
      */
     static verifyAndBoard(driverId: string, tripId: string, token: string, clientLat?: number, clientLng?: number): Promise<QrVerificationResponse>;
     private static logScan;

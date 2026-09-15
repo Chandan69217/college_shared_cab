@@ -12,10 +12,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(text: 'student1@college.edu');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   String _selectedRole = 'STUDENT'; // 'STUDENT' or 'DRIVER'
   bool _obscurePassword = true;
+  String? _emailError;
+  String? _passwordError;
 
   @override
   void dispose() {
@@ -24,28 +26,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _autofillDemoStudent() {
-    setState(() {
-      _selectedRole = 'STUDENT';
-      _emailController.text = 'student1@college.edu';
-      _passwordController.text = 'password123';
-    });
-  }
-
-  void _autofillDemoDriver() {
-    setState(() {
-      _selectedRole = 'DRIVER';
-      _emailController.text = 'driver1@collegecab.com';
-      _passwordController.text = 'password123';
-    });
-  }
-
   Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+    });
+
+    bool hasError = false;
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Email or mobile number is required.');
+      hasError = true;
+    }
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Password is required.');
+      hasError = true;
+    } else if (password.length < 6) {
+      setState(() => _passwordError = 'Password must be at least 6 characters.');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
     final success = await ref
         .read(authProvider.notifier)
         .login(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
+          email,
+          password,
           _selectedRole,
         );
 
@@ -131,7 +140,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: GestureDetector(
                           onTap: () {
                             setState(() => _selectedRole = 'STUDENT');
-                            _autofillDemoStudent();
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -171,7 +179,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: GestureDetector(
                           onTap: () {
                             setState(() => _selectedRole = 'DRIVER');
-                            _autofillDemoDriver();
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -254,7 +261,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'College Email / Mobile Number',
                     prefixIcon: const Icon(Icons.mail_outline, size: 20),
+                    errorText: _emailError,
                   ),
+                  onChanged: (_) {
+                    if (_emailError != null) setState(() => _emailError = null);
+                  },
                 ),
                 const SizedBox(height: 14),
 
@@ -266,6 +277,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                    errorText: _passwordError,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -279,8 +291,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       },
                     ),
                   ),
+                  onChanged: (_) {
+                    if (_passwordError != null) setState(() => _passwordError = null);
+                  },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 6),
+
+                // Forgot Password link
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => context.push('/forgot-password'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(50, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Forgot Password?',
+                      style: TextStyle(color: AppColors.primaryLight, fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
                 // Login Submit Button
                 ElevatedButton(
@@ -295,29 +328,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         )
                       : Text('Sign In as $_selectedRole'),
-                ),
-                const SizedBox(height: 16),
-
-                // Quick Demo Autofill helper button
-                OutlinedButton.icon(
-                  onPressed: _selectedRole == 'STUDENT'
-                      ? _autofillDemoStudent
-                      : _autofillDemoDriver,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primaryLight,
-                    side: const BorderSide(color: Color(0xFF374151)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  icon: const Icon(Icons.bolt_rounded, size: 18),
-                  label: Text(
-                    _selectedRole == 'STUDENT'
-                        ? 'Autofill Demo Student (Aarav)'
-                        : 'Autofill Demo Driver (Rajesh)',
-                    style: const TextStyle(fontSize: 12),
-                  ),
                 ),
                 const SizedBox(height: 20),
 

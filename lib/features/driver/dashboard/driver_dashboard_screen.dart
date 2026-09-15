@@ -50,7 +50,10 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to start trip.')),
+          SnackBar(
+            content: Text(ApiClient.getErrorMessage(e)),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -71,7 +74,10 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to end trip.')),
+          SnackBar(
+            content: Text(ApiClient.getErrorMessage(e)),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -148,7 +154,11 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    isInProgress ? 'TRIP IN PROGRESS' : 'SCHEDULED NEXT TRIP',
+                                    activeTrip == null
+                                        ? 'NO ACTIVE ASSIGNMENT'
+                                        : isInProgress
+                                            ? 'TRIP IN PROGRESS'
+                                            : 'SCHEDULED NEXT TRIP',
                                     style: TextStyle(
                                       color: isInProgress ? AppColors.primaryLight : AppColors.accentBlue,
                                       fontWeight: FontWeight.w900,
@@ -157,27 +167,28 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                                   ),
                                 ],
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  activeTrip?['vehicle']?['vehicle_number'] ?? 'UP16-CZ-8821',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 11,
-                                    fontFamily: 'monospace',
+                              if (activeTrip?['vehicle']?['vehicle_number'] != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    activeTrip!['vehicle']['vehicle_number'],
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            activeTrip?['route']?['name'] ?? 'Route 1: Central Metro Express',
+                            activeTrip?['route']?['name'] ?? 'No Active Route Assigned',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -186,7 +197,9 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Departure: ${activeTrip?['scheduled_departure_time'] ?? '07:30 AM'} • Capacity: ${activeTrip?['max_capacity'] ?? 6} Pax',
+                            activeTrip != null
+                                ? 'Departure: ${activeTrip['scheduled_departure_time'] ?? 'Pending'} • Capacity: ${activeTrip['max_capacity'] ?? 6} Pax'
+                                : 'Awaiting dispatch assignment from campus fleet admin.',
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                           ),
                           const SizedBox(height: 16),
@@ -206,7 +219,7 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                                       const Text('Booked Pax', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${activeTrip?['booked_seats'] ?? 1}',
+                                        '${activeTrip?['booked_seats'] ?? 0}',
                                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                                       ),
                                     ],
@@ -267,7 +280,7 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                                   minimumSize: const Size.fromHeight(44),
                                 ),
                                 icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                                label: const Text('Start Morning Trip'),
+                                label: const Text('Start Trip'),
                               )
                             else if (tripStatus == 'IN_PROGRESS')
                               ElevatedButton.icon(

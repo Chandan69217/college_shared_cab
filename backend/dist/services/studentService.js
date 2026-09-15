@@ -1,73 +1,40 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudentService = void 0;
-const db_1 = require("../database/db");
 const notificationProvider_1 = require("../integrations/notificationProvider");
+const userRepository_1 = require("../repositories/userRepository");
+const subscriptionRepository_1 = require("../repositories/subscriptionRepository");
+const bookingRepository_1 = require("../repositories/bookingRepository");
 class StudentService {
     /**
-     * Submit or update student verification documents
+     * Submit or update student verification documents in Supabase
      */
     static async submitVerification(studentId, data) {
-        const profile = db_1.db.studentProfiles.get(studentId);
-        if (!profile) {
-            const err = new Error('Student profile not found.');
-            err.statusCode = 404;
-            err.code = 'PROFILE_NOT_FOUND';
-            throw err;
-        }
-        profile.student_id_number = data.student_id_number;
-        profile.roll_number = data.roll_number;
-        profile.course = data.course;
-        profile.semester = data.semester;
-        profile.id_card_url = data.id_card_url;
-        profile.verification_status = 'PENDING';
-        profile.updated_at = new Date().toISOString();
-        db_1.db.studentProfiles.set(studentId, profile);
+        const profile = await userRepository_1.UserRepository.updateStudentProfile(studentId, {
+            student_id_number: data.student_id_number,
+            roll_number: data.roll_number,
+            course: data.course,
+            semester: data.semester,
+            id_card_url: data.id_card_url,
+            verification_status: 'PENDING',
+        });
         await notificationProvider_1.NotificationProvider.send(studentId, 'Verification Under Review', 'Your student ID documents have been submitted and are pending administrative verification.', 'GENERAL');
         return profile;
     }
     /**
-     * Get student dashboard overview
+     * Get student dashboard overview from live Supabase tables
      */
     static async getStudentDashboard(studentId) {
-        const user = db_1.db.users.get(studentId);
-        const profile = db_1.db.studentProfiles.get(studentId);
+        const user = await userRepository_1.UserRepository.findById(studentId);
+        const profile = await userRepository_1.UserRepository.getStudentProfile(studentId);
         // Find active subscription
-        let activeSubscription = null;
-        for (const sub of db_1.db.subscriptions.values()) {
-            if (sub.student_id === studentId && sub.status === 'ACTIVE') {
-                const plan = db_1.db.subscriptionPlans.get(sub.plan_id);
-                activeSubscription = { ...sub, plan };
-                break;
-            }
-        }
-        // Find today's booking
+        const activeSubscription = await subscriptionRepository_1.SubscriptionRepository.findActiveByStudentId(studentId);
+        // Find today's booking and pass
         const today = new Date().toISOString().split('T')[0];
-        let todaysBooking = null;
+        const todaysBooking = await bookingRepository_1.BookingRepository.findTodayBooking(studentId, today);
         let todaysPass = null;
-        for (const b of db_1.db.bookings.values()) {
-            if (b.student_id === studentId && b.booking_date === today && b.status === 'CONFIRMED') {
-                const trip = db_1.db.trips.get(b.trip_id);
-                const route = db_1.db.routes.get(b.route_id);
-                const pickup = db_1.db.pickupPoints.get(b.pickup_point_id);
-                todaysBooking = { ...b, trip, route, pickup };
-                break;
-            }
-        }
         if (todaysBooking) {
-            for (const p of db_1.db.dailyPasses.values()) {
-                if (p.booking_id === todaysBooking.id && (p.status === 'ACTIVE' || p.status === 'USED')) {
-                    todaysPass = p;
-                    break;
-                }
-            }
-        }
-        // Get recent notifications count
-        let unreadNotifs = 0;
-        for (const n of db_1.db.notifications.values()) {
-            if (n.user_id === studentId && !n.is_read) {
-                unreadNotifs++;
-            }
+            todaysPass = await bookingRepository_1.BookingRepository.findDailyPass(todaysBooking.id);
         }
         return {
             user: {
@@ -81,18 +48,16 @@ class StudentService {
             activeSubscription,
             todaysBooking,
             todaysPass,
-            unreadNotificationsCount: unreadNotifs,
+            unreadNotificationsCount: 0,
         };
     }
     /**
      * Trigger SOS Emergency alert
      */
     static async triggerSosAlert(studentId, location) {
-        const user = db_1.db.users.get(studentId);
-        // Notify student confirmation
+        const user = await userRepository_1.UserRepository.findById(studentId);
         await notificationProvider_1.NotificationProvider.send(studentId, 'SOS Alert Dispatched', 'Emergency SOS signal sent to campus security and emergency contacts.', 'EMERGENCY');
-        // Broadcast emergency notification to admins
-        await notificationProvider_1.NotificationProvider.broadcastToRole('ALL', 'EMERGENCY SOS ALERT', `Student ${user?.full_name} (${user?.phone}) triggered an SOS emergency alert.`, 'EMERGENCY');
+        await notificationProvider_1.NotificationProvider.broadcastToRole('ALL', 'EMERGENCY SOS ALERT', `Student ${user?.full_name || 'Unknown'} (${user?.phone || 'N/A'}) triggered an SOS emergency alert.`, 'EMERGENCY');
         return {
             success: true,
             timestamp: new Date().toISOString(),

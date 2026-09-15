@@ -2,9 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingController = void 0;
 const bookingService_1 = require("../services/bookingService");
+const bookingRepository_1 = require("../repositories/bookingRepository");
 const schemas_1 = require("../validators/schemas");
 const response_1 = require("../utils/response");
-const db_1 = require("../database/db");
 class BookingController {
     static async bookRide(req, res, next) {
         try {
@@ -22,8 +22,8 @@ class BookingController {
             const studentId = req.user.userId;
             const bookingId = req.params.id;
             const validated = schemas_1.cancelBookingSchema.parse(req.body);
-            const result = await bookingService_1.BookingService.cancelBooking(bookingId, studentId, validated.reason);
-            (0, response_1.sendSuccess)(res, 'Booking cancelled successfully.', result);
+            await bookingService_1.BookingService.cancelBooking(bookingId, studentId, validated.reason);
+            (0, response_1.sendSuccess)(res, 'Booking cancelled successfully.', { bookingId, status: 'CANCELLED' });
         }
         catch (err) {
             next(err);
@@ -31,21 +31,9 @@ class BookingController {
     }
     static async getAllBookings(req, res, next) {
         try {
-            const bookings = [];
-            for (const b of db_1.db.bookings.values()) {
-                const student = db_1.db.users.get(b.student_id);
-                const trip = db_1.db.trips.get(b.trip_id);
-                const route = db_1.db.routes.get(b.route_id);
-                const pickup = db_1.db.pickupPoints.get(b.pickup_point_id);
-                bookings.push({
-                    ...b,
-                    student: student ? { id: student.id, name: student.full_name, phone: student.phone } : undefined,
-                    trip,
-                    route,
-                    pickup,
-                });
-            }
-            (0, response_1.sendSuccess)(res, 'All bookings retrieved.', bookings.reverse());
+            const date = req.query.date;
+            const bookings = await bookingRepository_1.BookingRepository.findAll(date);
+            (0, response_1.sendSuccess)(res, 'All bookings retrieved.', bookings);
         }
         catch (err) {
             next(err);

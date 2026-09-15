@@ -1,39 +1,49 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationProvider = void 0;
-const db_1 = require("../database/db");
+const supabaseClient_1 = require("../database/supabaseClient");
 const logger_1 = require("../utils/logger");
 class NotificationProvider {
     /**
-     * Sends in-app and simulated push notification
+     * Sends in-app and simulated push notification to Supabase notifications table
      */
     static async send(userId, title, message, type, data = {}) {
-        const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        const notification = {
-            id: notifId,
-            user_id: userId,
-            title,
-            message,
-            type,
-            is_read: false,
-            data,
-            created_at: new Date().toISOString(),
-        };
-        db_1.db.notifications.set(notifId, notification);
+        const supabase = (0, supabaseClient_1.getSupabaseClient)();
+        if (supabase) {
+            await supabase.from('notifications').insert([{
+                    user_id: userId,
+                    title,
+                    message,
+                    type,
+                    is_read: false,
+                    data,
+                }]).select().maybeSingle();
+        }
         logger_1.logger.info(`Notification sent to User ${userId}: "${title}" [${type}]`);
     }
     /**
      * Broadcasts to all users of a specific role
      */
     static async broadcastToRole(role, title, message, type = 'GENERAL') {
-        let count = 0;
-        for (const [userId, user] of db_1.db.users.entries()) {
-            if (role === 'ALL' || user.role === role) {
-                await this.send(userId, title, message, type);
-                count++;
-            }
+        const supabase = (0, supabaseClient_1.getSupabaseClient)();
+        if (!supabase)
+            return 0;
+        let query = supabase.from('users').select('id, role');
+        if (role !== 'ALL') {
+            query = query.eq('role', role);
         }
-        return count;
+        const { data: users } = await query;
+        if (!users || users.length === 0)
+            return 0;
+        const notifs = users.map((u) => ({
+            user_id: u.id,
+            title,
+            message,
+            type,
+            is_read: false,
+        }));
+        await supabase.from('notifications').insert(notifs);
+        return users.length;
     }
 }
 exports.NotificationProvider = NotificationProvider;

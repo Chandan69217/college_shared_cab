@@ -1,12 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PlanController = void 0;
-const db_1 = require("../database/db");
+const subscriptionRepository_1 = require("../repositories/subscriptionRepository");
 const response_1 = require("../utils/response");
 class PlanController {
     static async getPlans(req, res, next) {
         try {
-            const plans = Array.from(db_1.db.subscriptionPlans.values()).filter((p) => p.status !== 'ARCHIVED');
+            const collegeId = req.query.college_id;
+            const plans = await subscriptionRepository_1.PlanRepository.findAll(collegeId);
             (0, response_1.sendSuccess)(res, 'Subscription plans retrieved.', plans);
         }
         catch (err) {
@@ -15,10 +16,7 @@ class PlanController {
     }
     static async createPlan(req, res, next) {
         try {
-            const id = `plan-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-            const now = new Date().toISOString();
-            const plan = {
-                id,
+            const plan = await subscriptionRepository_1.PlanRepository.create({
                 college_id: req.body.college_id,
                 tier: req.body.tier,
                 name: req.body.name,
@@ -34,10 +32,7 @@ class PlanController {
                 cancellation_fee_percentage: req.body.cancellation_fee_percentage ?? 10,
                 additional_ride_charge: req.body.additional_ride_charge ?? 50,
                 status: req.body.status || 'ACTIVE',
-                created_at: now,
-                updated_at: now,
-            };
-            db_1.db.subscriptionPlans.set(id, plan);
+            });
             (0, response_1.sendSuccess)(res, 'Plan created successfully.', plan, 201);
         }
         catch (err) {
@@ -47,15 +42,7 @@ class PlanController {
     static async updatePlan(req, res, next) {
         try {
             const planId = req.params.id;
-            const plan = db_1.db.subscriptionPlans.get(planId);
-            if (!plan) {
-                const err = new Error('Plan not found.');
-                err.statusCode = 404;
-                err.code = 'PLAN_NOT_FOUND';
-                throw err;
-            }
-            Object.assign(plan, req.body, { updated_at: new Date().toISOString() });
-            db_1.db.subscriptionPlans.set(planId, plan);
+            const plan = await subscriptionRepository_1.PlanRepository.update(planId, req.body);
             (0, response_1.sendSuccess)(res, 'Plan updated successfully.', plan);
         }
         catch (err) {

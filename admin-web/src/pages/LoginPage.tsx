@@ -1,33 +1,49 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, Lock, Mail, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage } from '../services/api';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@collegecab.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailError('');
+    setPasswordError('');
+
+    let hasError = false;
+    if (!email.trim()) {
+      setEmailError('Email or username is required.');
+      hasError = true;
+    }
+    if (!password.trim()) {
+      setPasswordError('Password is required.');
+      hasError = true;
+    } else if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password.trim());
       navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  };
-
-  const autofillDemoAdmin = () => {
-    setEmail('admin@collegecab.com');
-    setPassword('password123');
   };
 
   return (
@@ -59,28 +75,45 @@ export const LoginPage: React.FC = () => {
               <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                required
+                autoComplete="username"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-                placeholder="admin@collegecab.com"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError('');
+                }}
+                className={`w-full bg-slate-950 border ${
+                  emailError ? 'border-rose-500' : 'border-slate-800'
+                } rounded-xl pl-9 pr-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition`}
+                placeholder="Enter administrator email or phone"
               />
             </div>
+            {emailError && <p className="text-rose-400 text-[11px] mt-1">{emailError}</p>}
           </div>
 
           <div>
-            <label className="block text-slate-300 font-medium mb-1">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-slate-300 font-medium">Password</label>
+              <Link to="/forgot-password" className="text-[11px] text-emerald-400 hover:underline">
+                Forgot Password?
+              </Link>
+            </div>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
-                required
+                autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
-                placeholder="••••••••"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (passwordError) setPasswordError('');
+                }}
+                className={`w-full bg-slate-950 border ${
+                  passwordError ? 'border-rose-500' : 'border-slate-800'
+                } rounded-xl pl-9 pr-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition`}
+                placeholder="Enter your password"
               />
             </div>
+            {passwordError && <p className="text-rose-400 text-[11px] mt-1">{passwordError}</p>}
           </div>
 
           <button
@@ -92,19 +125,8 @@ export const LoginPage: React.FC = () => {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
-
-        {/* 1-Click Demo Fill Banner */}
-        <div className="mt-6 pt-6 border-t border-slate-800/80 text-center">
-          <p className="text-[11px] text-slate-400 mb-2">Development / Testing Demo Account:</p>
-          <button
-            type="button"
-            onClick={autofillDemoAdmin}
-            className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-medium transition"
-          >
-            Autofill: admin@collegecab.com
-          </button>
-        </div>
       </div>
     </div>
   );
 };
+

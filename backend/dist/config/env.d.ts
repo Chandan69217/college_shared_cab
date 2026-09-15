@@ -17,4 +17,16 @@ export declare const ENV: {
     MAPS_API_KEY: string;
     FCM_SERVER_KEY: string;
     DEFAULT_SERVICE_RADIUS_KM: number;
+    SMTP_HOST: string;
+    SMTP_PORT: number;
+    SMTP_SECURE: boolean;
+    SMTP_USER: string;
+    SMTP_PASS: string;
+    SMTP_FROM: string;
+    SMS_GATEWAY_PROVIDER: string;
+    FAST2SMS_API_KEY: string;
+    TWILIO_ACCOUNT_SID: string;
+    TWILIO_AUTH_TOKEN: string;
+    TWILIO_PHONE_NUMBER: string;
+    MSG91_AUTH_KEY: string;
 };

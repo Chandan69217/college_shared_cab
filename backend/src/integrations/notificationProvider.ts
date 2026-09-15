@@ -1,10 +1,10 @@
-import { db } from '../database/db';
+import { getSupabaseClient } from '../database/supabaseClient';
 import { NotificationType } from '../types';
 import { logger } from '../utils/logger';
 
 export class NotificationProvider {
   /**
-   * Sends in-app and simulated push notification
+   * Sends in-app and simulated push notification to Supabase notifications table
    */
   public static async send(
     userId: string,
@@ -13,19 +13,17 @@ export class NotificationProvider {
     type: NotificationType,
     data: Record<string, any> = {}
   ): Promise<void> {
-    const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const notification = {
-      id: notifId,
-      user_id: userId,
-      title,
-      message,
-      type,
-      is_read: false,
-      data,
-      created_at: new Date().toISOString(),
-    };
-
-    db.notifications.set(notifId, notification);
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      await supabase.from('notifications').insert([{
+        user_id: userId,
+        title,
+        message,
+        type,
+        is_read: false,
+        data,
+      }]).select().maybeSingle();
+    }
     logger.info(`Notification sent to User ${userId}: "${title}" [${type}]`);
   }
 
@@ -38,13 +36,25 @@ export class NotificationProvider {
     message: string,
     type: NotificationType = 'GENERAL'
   ): Promise<number> {
-    let count = 0;
-    for (const [userId, user] of db.users.entries()) {
-      if (role === 'ALL' || user.role === role) {
-        await this.send(userId, title, message, type);
-        count++;
-      }
+    const supabase = getSupabaseClient();
+    if (!supabase) return 0;
+
+    let query = supabase.from('users').select('id, role');
+    if (role !== 'ALL') {
+      query = query.eq('role', role);
     }
-    return count;
+    const { data: users } = await query;
+    if (!users || users.length === 0) return 0;
+
+    const notifs = users.map((u: any) => ({
+      user_id: u.id,
+      title,
+      message,
+      type,
+      is_read: false,
+    }));
+
+    await supabase.from('notifications').insert(notifs);
+    return users.length;
   }
 }
