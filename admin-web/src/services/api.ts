@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-const apiBaseUrl = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL.toString().replace(/\/$/, '')}/api/v1`
-  : '/api/v1';
+const rawUrl = (import.meta.env.VITE_API_URL || 'https://college-shared-cab-api.onrender.com').toString().trim();
+const apiBaseUrl = rawUrl.endsWith('/api/v1')
+  ? rawUrl
+  : `${rawUrl.replace(/\/api$/, '').replace(/\/$/, '')}/api/v1`;
 
 export const api = axios.create({
   baseURL: apiBaseUrl,
