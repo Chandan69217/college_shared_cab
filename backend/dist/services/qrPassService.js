@@ -14,7 +14,7 @@ class QrPassService {
         const supabase = (0, supabaseClient_1.getSupabaseClient)();
         const { data: pass, error } = await supabase
             .from('daily_travel_passes')
-            .select('*, trip:trips(*), pickup_point:pickup_points(*)')
+            .select('*, trip:trips(*), pickup_point:pickup_points!daily_travel_passes_pickup_point_id_fkey(*), drop_point:pickup_points!daily_travel_passes_drop_point_id_fkey(*)')
             .eq('id', passId)
             .maybeSingle();
         if (error || !pass) {

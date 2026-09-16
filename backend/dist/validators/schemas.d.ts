@@ -497,17 +497,35 @@ export declare const subscribePlanSchema: z.ZodObject<{
     payment_method?: "UPI" | "DEBIT_CARD" | "CREDIT_CARD" | "NET_BANKING" | "WALLET" | undefined;
     auto_renew?: boolean | undefined;
 }>;
-export declare const checkAvailabilitySchema: z.ZodObject<{
-    route_id: z.ZodString;
+export declare const checkAvailabilitySchema: z.ZodEffects<z.ZodObject<{
+    route_id: z.ZodOptional<z.ZodString>;
+    trip_id: z.ZodOptional<z.ZodString>;
+    trip_type: z.ZodOptional<z.ZodEnum<["MORNING_PICKUP", "EVENING_DROP", "SPECIAL"]>>;
     pickup_point_id: z.ZodString;
     drop_point_id: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     pickup_point_id: string;
-    route_id: string;
+    route_id?: string | undefined;
+    trip_id?: string | undefined;
+    trip_type?: "MORNING_PICKUP" | "EVENING_DROP" | "SPECIAL" | undefined;
     drop_point_id?: string | undefined;
 }, {
     pickup_point_id: string;
-    route_id: string;
+    route_id?: string | undefined;
+    trip_id?: string | undefined;
+    trip_type?: "MORNING_PICKUP" | "EVENING_DROP" | "SPECIAL" | undefined;
+    drop_point_id?: string | undefined;
+}>, {
+    pickup_point_id: string;
+    route_id?: string | undefined;
+    trip_id?: string | undefined;
+    trip_type?: "MORNING_PICKUP" | "EVENING_DROP" | "SPECIAL" | undefined;
+    drop_point_id?: string | undefined;
+}, {
+    pickup_point_id: string;
+    route_id?: string | undefined;
+    trip_id?: string | undefined;
+    trip_type?: "MORNING_PICKUP" | "EVENING_DROP" | "SPECIAL" | undefined;
     drop_point_id?: string | undefined;
 }>;
 export declare const createBookingSchema: z.ZodObject<{

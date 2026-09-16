@@ -10,7 +10,7 @@ class BookingController {
         try {
             const studentId = req.user.userId;
             const validated = schemas_1.checkAvailabilitySchema.parse(req.body);
-            const result = await bookingService_1.BookingService.checkAvailability(studentId, validated.route_id, validated.pickup_point_id, validated.drop_point_id);
+            const result = await bookingService_1.BookingService.checkAvailability(studentId, validated.route_id, validated.pickup_point_id, validated.drop_point_id, validated.trip_id, validated.trip_type);
             (0, response_1.sendSuccess)(res, result.message, result, result.available ? 200 : 200);
         }
         catch (err) {

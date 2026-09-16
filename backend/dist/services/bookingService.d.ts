@@ -4,7 +4,7 @@ export declare class BookingService {
     /**
      * Check route, stop validity and live cab availability before booking
      */
-    static checkAvailability(studentId: string, routeId: string, pickupPointId: string, dropPointId?: string): Promise<{
+    static checkAvailability(studentId: string, routeId?: string, pickupPointId?: string, dropPointId?: string, tripId?: string, tripType?: string): Promise<{
         available: boolean;
         reason: string;
         message: string;

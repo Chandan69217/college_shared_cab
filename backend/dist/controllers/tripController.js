@@ -32,7 +32,7 @@ class TripController {
                 trip_type: req.body.trip_type,
                 scheduled_departure_time: req.body.scheduled_departure_time,
                 status: 'SCHEDULED',
-                max_capacity: vehicle?.seating_capacity || 6,
+                max_capacity: req.body.max_capacity ? Number(req.body.max_capacity) : (vehicle?.seating_capacity || 6),
                 booked_seats: 0,
                 boarded_passengers: 0,
             });

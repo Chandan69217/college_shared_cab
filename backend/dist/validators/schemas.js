@@ -179,10 +179,17 @@ exports.subscribePlanSchema = zod_1.z.object({
     payment_method: zod_1.z.enum(['UPI', 'DEBIT_CARD', 'CREDIT_CARD', 'NET_BANKING', 'WALLET']).default('UPI'),
     auto_renew: zod_1.z.boolean().default(false),
 });
-exports.checkAvailabilitySchema = zod_1.z.object({
-    route_id: zod_1.z.string().uuid(),
+exports.checkAvailabilitySchema = zod_1.z
+    .object({
+    route_id: zod_1.z.string().uuid().optional(),
+    trip_id: zod_1.z.string().uuid().optional(),
+    trip_type: zod_1.z.enum(['MORNING_PICKUP', 'EVENING_DROP', 'SPECIAL']).optional(),
     pickup_point_id: zod_1.z.string().uuid(),
     drop_point_id: zod_1.z.string().uuid().optional(),
+})
+    .refine((data) => data.route_id || data.trip_id, {
+    message: 'Either route_id or trip_id is required.',
+    path: ['route_id'],
 });
 exports.createBookingSchema = zod_1.z.object({
     trip_id: zod_1.z.string().uuid(),

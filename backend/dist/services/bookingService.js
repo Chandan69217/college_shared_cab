@@ -15,9 +15,17 @@ class BookingService {
     /**
      * Check route, stop validity and live cab availability before booking
      */
-    static async checkAvailability(studentId, routeId, pickupPointId, dropPointId) {
+    static async checkAvailability(studentId, routeId, pickupPointId, dropPointId, tripId, tripType) {
         const supabase = (0, supabaseClient_1.getSupabaseClient)();
         const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        if (!pickupPointId) {
+            return {
+                available: false,
+                reason: 'MISSING_PICKUP_POINT',
+                message: 'Pickup point ID is required.',
+                trips: [],
+            };
+        }
         // 1. Verify student profile verification status
         const studentProfile = await userRepository_1.UserRepository.getStudentProfile(studentId);
         if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
@@ -38,11 +46,26 @@ class BookingService {
                 trips: [],
             };
         }
+        let targetRouteId = routeId;
+        if (tripId && !targetRouteId) {
+            const tripObj = await tripRepository_1.TripRepository.findById(tripId);
+            if (tripObj) {
+                targetRouteId = tripObj.route_id;
+            }
+        }
+        if (!targetRouteId) {
+            return {
+                available: false,
+                reason: 'INVALID_ROUTE',
+                message: 'Route ID is required for checking availability.',
+                trips: [],
+            };
+        }
         // 3. Verify Route exists & active
         const { data: route, error: routeErr } = await supabase
             .from('routes')
             .select('*, college:colleges(*), route_pickup_points(*, pickup_point:pickup_points(*))')
-            .eq('id', routeId)
+            .eq('id', targetRouteId)
             .maybeSingle();
         if (routeErr || !route || !route.is_active) {
             return {
@@ -84,14 +107,21 @@ class BookingService {
             }
         }
         // 6. Ensure daily trips are instantiated for today
-        await tripRepository_1.TripRepository.syncDailyTripsForDate(todayIST, routeId);
-        // 7. Find all active/scheduled trips for today on this route
-        const { data: routeTrips, error: tripsErr } = await supabase
+        await tripRepository_1.TripRepository.syncDailyTripsForDate(todayIST, targetRouteId);
+        // 7. Find active/scheduled trips for today on this route
+        let tripsQuery = supabase
             .from('trips')
             .select('*, vehicle:vehicles(*), driver:users!trips_driver_id_fkey(*)')
-            .eq('route_id', routeId)
+            .eq('route_id', targetRouteId)
             .eq('trip_date', todayIST)
             .in('status', ['SCHEDULED', 'IN_PROGRESS']);
+        if (tripId) {
+            tripsQuery = tripsQuery.eq('id', tripId);
+        }
+        if (tripType) {
+            tripsQuery = tripsQuery.eq('trip_type', tripType);
+        }
+        const { data: routeTrips, error: tripsErr } = await tripsQuery;
         if (tripsErr || !routeTrips || routeTrips.length === 0) {
             return {
                 available: false,
@@ -318,6 +348,16 @@ class BookingService {
             const bookingId = atomicResult.booking_id;
             const passId = atomicResult.pass_id;
             const seatNumber = atomicResult.seat_number;
+            // 10. Generate and store the definitive dynamic HMAC QR token with the actual pass ID
+            const { token: realQrToken, expiresAt: realExpiresAt } = (0, crypto_1.generateDynamicQrToken)(passId, studentId, tripId, trip.route_id, trip.trip_date, 180);
+            await supabase
+                .from('daily_travel_passes')
+                .update({
+                qr_code_data: realQrToken,
+                qr_expires_at: new Date(realExpiresAt).toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+                .eq('id', passId);
             const { data: createdBooking } = await supabase
                 .from('bookings')
                 .select('*')
@@ -331,8 +371,8 @@ class BookingService {
             await notificationProvider_1.NotificationProvider.send(studentId, 'Ride Booked Successfully!', `Seat #${seatNumber} confirmed on scheduled trip. Your daily pass is ready.`, 'BOOKING', { bookingId, passId, tripId });
             return {
                 booking: { ...(createdBooking || {}), seat_number: seatNumber, trip, pickup_point: pickupPoint, drop_point: dropPoint },
-                pass: { ...(createdPass || {}), trip, pickup_point: pickupPoint, drop_point: dropPoint },
-                qrToken,
+                pass: { ...(createdPass || {}), qr_code_data: realQrToken, trip, pickup_point: pickupPoint, drop_point: dropPoint },
+                qrToken: realQrToken,
             };
         }
         finally {

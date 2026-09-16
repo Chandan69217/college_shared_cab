@@ -337,15 +337,16 @@ class CatalogController {
             if (!collegeId) {
                 return (0, response_1.sendError)(res, 'No active college found in system. Please register a college first.', 'COLLEGE_NOT_FOUND', null, 400);
             }
+            const defaultExpiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             const vehicle = await vehicleRepository_1.VehicleRepository.create({
                 college_id: collegeId,
                 vehicle_number: req.body.vehicle_number,
                 model: req.body.model,
                 type: req.body.type,
                 seating_capacity: req.body.seating_capacity,
-                registration_number: req.body.registration_number,
-                insurance_validity: req.body.insurance_validity,
-                fitness_validity: req.body.fitness_validity,
+                registration_number: req.body.registration_number || req.body.vehicle_number,
+                insurance_validity: req.body.insurance_validity || defaultExpiry,
+                fitness_validity: req.body.fitness_validity || defaultExpiry,
                 status: req.body.status || 'ACTIVE',
             });
             (0, response_1.sendSuccess)(res, 'Vehicle registered successfully.', vehicle, 201);

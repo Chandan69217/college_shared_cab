@@ -71,7 +71,7 @@ class StudentController {
             const supabase = (0, supabaseClient_1.getSupabaseClient)();
             const { data: passes, error } = await supabase
                 .from('daily_travel_passes')
-                .select('*, trip:trips(*, route:routes(*), vehicle:vehicles(*), driver:users!trips_driver_id_fkey(*)), route:routes(*), pickup_point:pickup_points(*)')
+                .select('*, trip:trips(*, route:routes(*), vehicle:vehicles(*), driver:users!trips_driver_id_fkey(*)), route:routes(*), pickup_point:pickup_points!daily_travel_passes_pickup_point_id_fkey(*), drop_point:pickup_points!daily_travel_passes_drop_point_id_fkey(*)')
                 .eq('student_id', studentId)
                 .order('created_at', { ascending: false });
             if (error)
