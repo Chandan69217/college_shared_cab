@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const rawUrl = (import.meta.env.VITE_API_URL || 'https://college-shared-cab-api.onrender.com').toString().trim();
+const defaultUrl = import.meta.env.DEV
+  ? 'http://localhost:5000/api/v1'
+  : 'https://college-shared-cab-api.onrender.com/api/v1';
+
+const rawUrl = (import.meta.env.VITE_API_URL || defaultUrl).toString().trim();
 const apiBaseUrl = rawUrl.endsWith('/api/v1')
   ? rawUrl
   : `${rawUrl.replace(/\/api$/, '').replace(/\/$/, '')}/api/v1`;
