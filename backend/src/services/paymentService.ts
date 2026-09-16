@@ -89,12 +89,21 @@ export class PaymentService {
     const supabase = getSupabaseClient()!;
     let query = supabase
       .from('payments')
-      .select('*, subscription:subscriptions(*, plan:subscription_plans(*))');
+      .select('*, subscription:subscriptions!payments_subscription_id_fkey(*, plan:subscription_plans(*))');
 
-    if (data.gateway_order_id) {
+    if (data.payment_id) {
+      query = query.eq('id', data.payment_id);
+    } else if (data.gateway_order_id) {
       query = query.eq('gateway_order_id', data.gateway_order_id);
-    } else if ((data as any).payment_id) {
-      query = query.eq('id', (data as any).payment_id);
+    } else {
+      const err: any = new Error('Payment record identifier is required.');
+      err.statusCode = 400;
+      err.code = 'INVALID_PAYMENT_PAYLOAD';
+      throw err;
+    }
+
+    if (studentId) {
+      query = query.eq('student_id', studentId);
     }
 
     const { data: payment, error } = await query.maybeSingle();
@@ -109,16 +118,19 @@ export class PaymentService {
     const now = new Date().toISOString();
 
     // Mark payment SUCCESS
-    await supabase
+    const { error: payUpdateErr } = await supabase
       .from('payments')
       .update({
         status: 'SUCCESS',
-        gateway_payment_id: data.gateway_payment_id,
+        transaction_id: data.gateway_payment_id,
         gateway_signature: data.gateway_signature,
-        paid_at: now,
         updated_at: now,
       })
       .eq('id', payment.id);
+
+    if (payUpdateErr) {
+      throw new Error(`Failed to update payment status: ${payUpdateErr.message}`);
+    }
 
     // Activate subscription
     await supabase

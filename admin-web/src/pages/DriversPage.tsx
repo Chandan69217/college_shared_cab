@@ -582,7 +582,7 @@ export const DriversPage: React.FC = () => {
           </p>
           <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-400">
             <p className="text-[11px]">
-              <strong>Safety Protection:</strong> Physical deletion is blocked if this driver is assigned to active routes or scheduled trips.
+              <strong>Automatic Unassignment:</strong> Deleting this driver will automatically unassign them from any active routes and scheduled trips.
             </p>
           </div>
           <div className="flex items-center justify-end gap-3 pt-2">

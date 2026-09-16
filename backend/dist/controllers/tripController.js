@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TripController = void 0;
 const trackingService_1 = require("../services/trackingService");
+const driverService_1 = require("../services/driverService");
 const schemas_1 = require("../validators/schemas");
 const response_1 = require("../utils/response");
 const tripRepository_1 = require("../repositories/tripRepository");
@@ -10,7 +11,10 @@ class TripController {
     static async getTrips(req, res, next) {
         try {
             const date = req.query.date;
-            const trips = await tripRepository_1.TripRepository.findAll(undefined, date);
+            const collegeId = req.query.college_id;
+            const todayIST = date || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+            await tripRepository_1.TripRepository.syncDailyTripsForDate(todayIST);
+            const trips = await tripRepository_1.TripRepository.findAll(collegeId, date);
             (0, response_1.sendSuccess)(res, 'Trips retrieved.', trips);
         }
         catch (err) {
@@ -38,11 +42,40 @@ class TripController {
             next(err);
         }
     }
+    static async startTrip(req, res, next) {
+        try {
+            const driverId = req.user.userId;
+            const tripId = req.params.tripId || req.params.id;
+            const trip = await driverService_1.DriverService.startTrip(tripId, driverId);
+            (0, response_1.sendSuccess)(res, 'Trip started successfully.', trip);
+        }
+        catch (err) {
+            next(err);
+        }
+    }
+    static async endTrip(req, res, next) {
+        try {
+            const driverId = req.user.userId;
+            const tripId = req.params.tripId || req.params.id;
+            const trip = await driverService_1.DriverService.endTrip(tripId, driverId);
+            (0, response_1.sendSuccess)(res, 'Trip ended successfully.', trip);
+        }
+        catch (err) {
+            next(err);
+        }
+    }
     static async updateLocation(req, res, next) {
         try {
             const driverId = req.user.userId;
+            const tripId = req.params.tripId || req.params.id || req.body.trip_id;
+            if (!tripId) {
+                const err = new Error('Trip ID is required.');
+                err.statusCode = 400;
+                err.code = 'MISSING_TRIP_ID';
+                throw err;
+            }
             const validated = schemas_1.updateGpsLocationSchema.parse(req.body);
-            const result = await trackingService_1.TrackingService.updateLocation(driverId, validated.trip_id, validated.latitude, validated.longitude, validated.speed, validated.heading);
+            const result = await trackingService_1.TrackingService.updateLocation(driverId, tripId, validated.latitude, validated.longitude, validated.accuracy, validated.speed, validated.heading, validated.timestamp);
             (0, response_1.sendSuccess)(res, 'GPS location updated.', result);
         }
         catch (err) {
@@ -51,7 +84,7 @@ class TripController {
     }
     static async getTripLocation(req, res, next) {
         try {
-            const tripId = req.params.id;
+            const tripId = req.params.tripId || req.params.id;
             const result = await trackingService_1.TrackingService.getTripLocation(tripId);
             (0, response_1.sendSuccess)(res, 'Live vehicle location retrieved.', result);
         }
@@ -61,8 +94,19 @@ class TripController {
     }
     static async getAllActiveLocations(req, res, next) {
         try {
-            const result = await trackingService_1.TrackingService.getAllActiveVehicles();
+            const collegeId = req.query.college_id;
+            const result = await trackingService_1.TrackingService.getAllActiveVehicles(collegeId);
             (0, response_1.sendSuccess)(res, 'Active fleet locations retrieved.', result);
+        }
+        catch (err) {
+            next(err);
+        }
+    }
+    static async getTripHistory(req, res, next) {
+        try {
+            const tripId = req.params.tripId || req.params.id;
+            const result = await trackingService_1.TrackingService.getTripLocationHistory(tripId);
+            (0, response_1.sendSuccess)(res, 'Trip location history retrieved.', result);
         }
         catch (err) {
             next(err);

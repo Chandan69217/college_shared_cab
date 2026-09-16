@@ -12,5 +12,8 @@ router.get('/', PlanController.getPlans);
 // Admin-only plan configuration
 router.post('/', authenticateJwt, requireRole(['ADMIN']), auditLog('CREATE_PLAN', 'subscription_plans'), PlanController.createPlan);
 router.patch('/:id', authenticateJwt, requireRole(['ADMIN']), auditLog('UPDATE_PLAN', 'subscription_plans'), PlanController.updatePlan);
+router.put('/:id', authenticateJwt, requireRole(['ADMIN']), auditLog('UPDATE_PLAN', 'subscription_plans'), PlanController.updatePlan);
+router.delete('/:id', authenticateJwt, requireRole(['ADMIN']), auditLog('DELETE_PLAN', 'subscription_plans'), PlanController.deletePlan);
 
 export default router;
+

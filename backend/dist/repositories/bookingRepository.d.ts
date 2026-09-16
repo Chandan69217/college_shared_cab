@@ -8,6 +8,6 @@ export declare class BookingRepository {
     static findActivePassByStudent(studentId: string): Promise<DailyTravelPass | null>;
     static findPassByTokenHash(tokenHash: string): Promise<DailyTravelPass | null>;
     static updatePass(id: string, updates: Partial<DailyTravelPass>): Promise<DailyTravelPass>;
-    static bookTripAtomic(studentId: string, tripId: string, pickupPointId: string, tokenHash: string, validUntil: Date): Promise<any>;
+    static bookTripAtomic(studentId: string, subscriptionId: string, tripId: string, pickupPointId: string, tokenHash: string, validUntil: Date, dropPointId?: string): Promise<any>;
     static cancelBooking(bookingId: string, studentId: string): Promise<void>;
 }

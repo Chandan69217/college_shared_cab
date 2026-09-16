@@ -17,6 +17,7 @@ import { Vehicle } from '../types';
 
 export const VehiclesPage: React.FC = () => {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [colleges, setColleges] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -30,7 +31,7 @@ export const VehiclesPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
-    college_id: '11111111-1111-1111-1111-111111111111',
+    college_id: '',
     vehicle_number: '',
     model: '',
     type: 'CAB_6',
@@ -43,9 +44,15 @@ export const VehiclesPage: React.FC = () => {
 
   const fetchVehicles = async () => {
     try {
-      const res = await api.get('/catalog/vehicles');
-      if (res.data.success) {
-        setVehicles(res.data.data);
+      const [vRes, cRes] = await Promise.all([
+        api.get('/catalog/vehicles'),
+        api.get('/catalog/colleges'),
+      ]);
+      if (vRes.data.success) {
+        setVehicles(vRes.data.data);
+      }
+      if (cRes.data.success) {
+        setColleges(cRes.data.data);
       }
     } catch (err: any) {
       console.error(err);
@@ -58,7 +65,7 @@ export const VehiclesPage: React.FC = () => {
 
   const openAddModal = () => {
     setFormData({
-      college_id: '11111111-1111-1111-1111-111111111111',
+      college_id: colleges[0]?.id || '',
       vehicle_number: '',
       model: '',
       type: 'CAB_6',
@@ -75,7 +82,7 @@ export const VehiclesPage: React.FC = () => {
   const openEditModal = (v: Vehicle) => {
     setSelectedVehicle(v);
     setFormData({
-      college_id: v.college_id,
+      college_id: v.college_id || colleges[0]?.id || '',
       vehicle_number: v.vehicle_number,
       model: v.model,
       type: v.type,

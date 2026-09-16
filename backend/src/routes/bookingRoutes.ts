@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticateJwt);
 
 // Student booking actions
+router.post('/check-availability', requireRole(['STUDENT']), BookingController.checkAvailability);
 router.post('/', requireRole(['STUDENT']), auditLog('BOOK_RIDE', 'bookings'), BookingController.bookRide);
 router.post('/:id/cancel', requireRole(['STUDENT']), auditLog('CANCEL_BOOKING', 'bookings'), BookingController.cancelBooking);
 

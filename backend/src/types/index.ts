@@ -81,6 +81,7 @@ export interface College {
 export interface StudentProfile {
   id: string; // references User.id
   college_id: string;
+  college?: College;
   student_id_number: string;
   roll_number?: string;
   course: string;
@@ -97,6 +98,7 @@ export interface StudentProfile {
 export interface DriverProfile {
   id: string; // references User.id
   college_id: string;
+  college?: College;
   license_number: string;
   license_expiry: string;
   aadhar_number?: string;
@@ -121,6 +123,7 @@ export interface AdminProfile {
 export interface PickupPoint {
   id: string;
   college_id: string;
+  college?: College;
   name: string;
   landmark?: string;
   address: string;
@@ -136,6 +139,7 @@ export interface PickupPoint {
 export interface Vehicle {
   id: string;
   college_id: string;
+  college?: College;
   vehicle_number: string;
   model: string;
   type: VehicleType;
@@ -162,6 +166,7 @@ export interface RouteStop {
 export interface Route {
   id: string;
   college_id: string;
+  college?: College;
   name: string;
   code: string;
   description?: string;
@@ -180,6 +185,7 @@ export interface Route {
 export interface SubscriptionPlan {
   id: string;
   college_id: string;
+  college?: College;
   tier: PlanTier;
   name: string;
   description?: string;
@@ -220,8 +226,8 @@ export interface Trip {
   route?: Route;
   vehicle_id: string;
   vehicle?: Vehicle;
-  driver_id: string;
-  driver?: User;
+  driver_id?: string | null;
+  driver?: User | null;
   trip_date: string;
   trip_type: TripType;
   scheduled_departure_time: string;
@@ -231,11 +237,39 @@ export interface Trip {
   max_capacity: number;
   booked_seats: number;
   boarded_passengers: number;
+  current_stop_sequence?: number;
   live_latitude?: number;
   live_longitude?: number;
   last_gps_update?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface VehicleCurrentLocation {
+  id: string;
+  vehicle_id: string;
+  trip_id: string;
+  driver_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  speed: number;
+  heading: number;
+  timestamp: string;
+  updated_at: string;
+}
+
+export interface VehicleLocationHistory {
+  id: string;
+  vehicle_id: string;
+  trip_id: string;
+  driver_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  speed: number;
+  heading: number;
+  recorded_at: string;
 }
 
 export interface Booking {
@@ -249,6 +283,8 @@ export interface Booking {
   route?: Route;
   pickup_point_id: string;
   pickup_point?: PickupPoint;
+  drop_point_id?: string;
+  drop_point?: PickupPoint;
   booking_date: string;
   trip_type: TripType;
   seat_number?: number;
@@ -267,6 +303,12 @@ export interface TripPassenger {
   student?: User;
   pickup_point_id: string;
   pickup_point?: PickupPoint;
+  drop_point_id?: string;
+  drop_point?: PickupPoint;
+  pickup_stop_sequence?: number;
+  drop_stop_sequence?: number;
+  pickup_name?: string;
+  drop_name?: string;
   status: PassengerStatus;
   boarded_at?: string;
   verified_by_driver_id?: string;
@@ -286,6 +328,8 @@ export interface DailyTravelPass {
   route?: Route;
   pickup_point_id: string;
   pickup_point?: PickupPoint;
+  drop_point_id?: string;
+  drop_point?: PickupPoint;
   auth_token_hash: string;
   valid_until: string;
   status: PassStatus;

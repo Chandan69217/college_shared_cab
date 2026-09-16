@@ -11,6 +11,7 @@ router.get('/colleges/lookup', CatalogController.lookupCollege);
 router.get('/colleges', CatalogController.getColleges);
 router.get('/pickup-points', CatalogController.getPickupPoints);
 router.get('/routes', CatalogController.getRoutes);
+router.get('/routes/:routeId/map', CatalogController.getRouteMap);
 router.get('/vehicles', CatalogController.getVehicles);
 
 // Admin-only mutation endpoints

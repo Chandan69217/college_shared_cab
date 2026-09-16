@@ -169,13 +169,13 @@ export const createVehicleSchema = z.object({
 });
 
 export const createPlanSchema = z.object({
-  college_id: z.string().uuid(),
-  tier: z.enum(['BASIC', 'STANDARD', 'PREMIUM']),
+  college_id: z.string().uuid().optional(),
+  tier: z.enum(['BASIC', 'STANDARD', 'PREMIUM']).default('STANDARD'),
   name: z.string().min(2).max(150),
   description: z.string().optional(),
   price: z.number().nonnegative(),
-  validity_days: z.number().int().positive(),
-  ride_count_total: z.number().int().positive(),
+  validity_days: z.number().int().positive().default(30),
+  ride_count_total: z.number().int().positive().default(44),
   is_unlimited_rides: z.boolean().default(false),
   priority_booking: z.boolean().default(false),
   one_way_allowed: z.boolean().default(true),
@@ -183,7 +183,10 @@ export const createPlanSchema = z.object({
   cancellation_hours_limit: z.number().int().nonnegative().default(2),
   cancellation_fee_percentage: z.number().min(0).max(100).default(10),
   additional_ride_charge: z.number().nonnegative().default(50),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).default('ACTIVE'),
 });
+
+export const updatePlanSchema = createPlanSchema.partial();
 
 export const subscribePlanSchema = z.object({
   plan_id: z.string().uuid(),
@@ -191,9 +194,23 @@ export const subscribePlanSchema = z.object({
   auto_renew: z.boolean().default(false),
 });
 
+export const checkAvailabilitySchema = z
+  .object({
+    route_id: z.string().uuid().optional(),
+    trip_id: z.string().uuid().optional(),
+    trip_type: z.enum(['MORNING_PICKUP', 'EVENING_DROP', 'SPECIAL']).optional(),
+    pickup_point_id: z.string().uuid(),
+    drop_point_id: z.string().uuid().optional(),
+  })
+  .refine((data) => data.route_id || data.trip_id, {
+    message: 'Either route_id or trip_id is required.',
+    path: ['route_id'],
+  });
+
 export const createBookingSchema = z.object({
   trip_id: z.string().uuid(),
   pickup_point_id: z.string().uuid(),
+  drop_point_id: z.string().uuid().optional(),
 });
 
 export const cancelBookingSchema = z.object({
@@ -208,11 +225,13 @@ export const verifyQrScanSchema = z.object({
 });
 
 export const updateGpsLocationSchema = z.object({
-  trip_id: z.string().uuid(),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
+  trip_id: z.string().uuid().optional(),
+  latitude: z.number().min(-90, 'Latitude must be between -90 and 90.').max(90, 'Latitude must be between -90 and 90.'),
+  longitude: z.number().min(-180, 'Longitude must be between -180 and 180.').max(180, 'Longitude must be between -180 and 180.'),
+  accuracy: z.number().nonnegative().default(5.0),
   speed: z.number().nonnegative().default(0),
   heading: z.number().min(0).max(360).default(0),
+  timestamp: z.string().optional(),
 });
 
 export const createComplaintSchema = z.object({
@@ -272,4 +291,5 @@ export const updateAdminProfileSchema = z.object({
   department: z.string().min(2).max(100).optional(),
   permissions: z.array(z.string()).optional(),
 });
+
 

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAdminProfileSchema = exports.createAdminProfileSchema = exports.createAdminSchema = exports.createHolidaySchema = exports.rateTripSchema = exports.replyComplaintSchema = exports.createComplaintSchema = exports.updateGpsLocationSchema = exports.verifyQrScanSchema = exports.cancelBookingSchema = exports.createBookingSchema = exports.subscribePlanSchema = exports.createPlanSchema = exports.createVehicleSchema = exports.createRouteSchema = exports.createPickupPointSchema = exports.updateProfileSchema = exports.resetPasswordSchema = exports.verifyRecoveryOtpSchema = exports.forgotPasswordSchema = exports.changePasswordSchema = exports.verifyOtpSchema = exports.requestOtpSchema = exports.loginSchema = exports.registerStudentSchema = void 0;
+exports.updateAdminProfileSchema = exports.createAdminProfileSchema = exports.createAdminSchema = exports.createHolidaySchema = exports.rateTripSchema = exports.replyComplaintSchema = exports.createComplaintSchema = exports.updateGpsLocationSchema = exports.verifyQrScanSchema = exports.cancelBookingSchema = exports.createBookingSchema = exports.checkAvailabilitySchema = exports.subscribePlanSchema = exports.updatePlanSchema = exports.createPlanSchema = exports.createVehicleSchema = exports.createRouteSchema = exports.createPickupPointSchema = exports.updateProfileSchema = exports.resetPasswordSchema = exports.verifyRecoveryOtpSchema = exports.forgotPasswordSchema = exports.changePasswordSchema = exports.verifyOtpSchema = exports.requestOtpSchema = exports.loginSchema = exports.registerStudentSchema = void 0;
 const zod_1 = require("zod");
 exports.registerStudentSchema = zod_1.z
     .object({
@@ -157,13 +157,13 @@ exports.createVehicleSchema = zod_1.z.object({
     fitness_validity: zod_1.z.string(),
 });
 exports.createPlanSchema = zod_1.z.object({
-    college_id: zod_1.z.string().uuid(),
-    tier: zod_1.z.enum(['BASIC', 'STANDARD', 'PREMIUM']),
+    college_id: zod_1.z.string().uuid().optional(),
+    tier: zod_1.z.enum(['BASIC', 'STANDARD', 'PREMIUM']).default('STANDARD'),
     name: zod_1.z.string().min(2).max(150),
     description: zod_1.z.string().optional(),
     price: zod_1.z.number().nonnegative(),
-    validity_days: zod_1.z.number().int().positive(),
-    ride_count_total: zod_1.z.number().int().positive(),
+    validity_days: zod_1.z.number().int().positive().default(30),
+    ride_count_total: zod_1.z.number().int().positive().default(44),
     is_unlimited_rides: zod_1.z.boolean().default(false),
     priority_booking: zod_1.z.boolean().default(false),
     one_way_allowed: zod_1.z.boolean().default(true),
@@ -171,15 +171,23 @@ exports.createPlanSchema = zod_1.z.object({
     cancellation_hours_limit: zod_1.z.number().int().nonnegative().default(2),
     cancellation_fee_percentage: zod_1.z.number().min(0).max(100).default(10),
     additional_ride_charge: zod_1.z.number().nonnegative().default(50),
+    status: zod_1.z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']).default('ACTIVE'),
 });
+exports.updatePlanSchema = exports.createPlanSchema.partial();
 exports.subscribePlanSchema = zod_1.z.object({
     plan_id: zod_1.z.string().uuid(),
     payment_method: zod_1.z.enum(['UPI', 'DEBIT_CARD', 'CREDIT_CARD', 'NET_BANKING', 'WALLET']).default('UPI'),
     auto_renew: zod_1.z.boolean().default(false),
 });
+exports.checkAvailabilitySchema = zod_1.z.object({
+    route_id: zod_1.z.string().uuid(),
+    pickup_point_id: zod_1.z.string().uuid(),
+    drop_point_id: zod_1.z.string().uuid().optional(),
+});
 exports.createBookingSchema = zod_1.z.object({
     trip_id: zod_1.z.string().uuid(),
     pickup_point_id: zod_1.z.string().uuid(),
+    drop_point_id: zod_1.z.string().uuid().optional(),
 });
 exports.cancelBookingSchema = zod_1.z.object({
     reason: zod_1.z.string().min(3).max(500),
@@ -191,11 +199,13 @@ exports.verifyQrScanSchema = zod_1.z.object({
     client_longitude: zod_1.z.number().optional(),
 });
 exports.updateGpsLocationSchema = zod_1.z.object({
-    trip_id: zod_1.z.string().uuid(),
-    latitude: zod_1.z.number().min(-90).max(90),
-    longitude: zod_1.z.number().min(-180).max(180),
+    trip_id: zod_1.z.string().uuid().optional(),
+    latitude: zod_1.z.number().min(-90, 'Latitude must be between -90 and 90.').max(90, 'Latitude must be between -90 and 90.'),
+    longitude: zod_1.z.number().min(-180, 'Longitude must be between -180 and 180.').max(180, 'Longitude must be between -180 and 180.'),
+    accuracy: zod_1.z.number().nonnegative().default(5.0),
     speed: zod_1.z.number().nonnegative().default(0),
     heading: zod_1.z.number().min(0).max(360).default(0),
+    timestamp: zod_1.z.string().optional(),
 });
 exports.createComplaintSchema = zod_1.z.object({
     category: zod_1.z.enum([

@@ -11,7 +11,7 @@ export class PickupPointRepository {
   public static async findAll(collegeId?: string): Promise<PickupPoint[]> {
     let query = this.getClient()
       .from('pickup_points')
-      .select('*')
+      .select('*, college:colleges(*)')
       .order('name');
 
     if (collegeId) {
@@ -26,7 +26,7 @@ export class PickupPointRepository {
   public static async findById(id: string): Promise<PickupPoint | null> {
     const { data, error } = await this.getClient()
       .from('pickup_points')
-      .select('*')
+      .select('*, college:colleges(*)')
       .eq('id', id)
       .maybeSingle();
 
@@ -67,37 +67,35 @@ export class PickupPointRepository {
       throw err;
     }
 
-    // Check if used in route stops
-    const { count: stopCount } = await client
-      .from('route_stops')
-      .select('id', { count: 'exact', head: true })
+    // 1. Automatically remove pickup point from all route stop schedules
+    await client
+      .from('route_pickup_points')
+      .delete()
       .eq('pickup_point_id', id);
 
-    if (stopCount && stopCount > 0) {
-      const err: any = new Error(
-        `Cannot delete pickup point "${point.name}". It is currently assigned to ${stopCount} route stop(s). Please remove it from route schedules or deactivate it instead.`
-      );
-      err.statusCode = 409;
-      err.code = 'ACTIVE_RELATIONSHIP_EXISTS';
-      throw err;
-    }
+    // 2. Unassign from delay reports
+    await client
+      .from('delay_reports')
+      .update({ current_stop_id: null })
+      .eq('current_stop_id', id);
 
-    // Check if referenced in active bookings
-    const { count: bookingCount } = await client
-      .from('student_bookings')
-      .select('id', { count: 'exact', head: true })
-      .or(`pickup_point_id.eq.${id},drop_point_id.eq.${id}`)
-      .in('status', ['CONFIRMED', 'BOARDED']);
+    // 3. Unassign from historical manifests, passes, and bookings
+    await client
+      .from('trip_passengers')
+      .update({ pickup_point_id: null })
+      .eq('pickup_point_id', id);
 
-    if (bookingCount && bookingCount > 0) {
-      const err: any = new Error(
-        `Cannot delete pickup point "${point.name}". It is associated with ${bookingCount} active or confirmed student ride booking(s).`
-      );
-      err.statusCode = 409;
-      err.code = 'ACTIVE_RELATIONSHIP_EXISTS';
-      throw err;
-    }
+    await client
+      .from('daily_travel_passes')
+      .update({ pickup_point_id: null })
+      .eq('pickup_point_id', id);
 
+    await client
+      .from('bookings')
+      .update({ pickup_point_id: null })
+      .eq('pickup_point_id', id);
+
+    // 4. Delete the pickup point
     const { error } = await client
       .from('pickup_points')
       .delete()

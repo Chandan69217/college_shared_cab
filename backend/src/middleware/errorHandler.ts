@@ -54,9 +54,19 @@ export function errorHandler(
 
   // PostgreSQL / Supabase Foreign key violation
   if (rawMsg.includes('violates foreign key constraint') || rawMsg.includes('23503')) {
+    if (rawMsg.includes('update or delete on table') || req.method === 'DELETE') {
+      sendError(
+        res,
+        'This record cannot be permanently deleted because active operational records (such as trips, bookings, or historical records) are linked to it. Please deactivate or archive it instead.',
+        'PROTECTED_RECORD_REFERENCE',
+        null,
+        409
+      );
+      return;
+    }
     sendError(
       res,
-      'The requested entity or reference does not exist or has been removed.',
+      'The referenced parent entity does not exist or has been removed.',
       'INVALID_REFERENCE',
       null,
       400

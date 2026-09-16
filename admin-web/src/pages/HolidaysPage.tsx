@@ -6,9 +6,10 @@ import { api } from '../services/api';
 
 export const HolidaysPage: React.FC = () => {
   const [holidays, setHolidays] = useState<any[]>([]);
+  const [colleges, setColleges] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    college_id: '11111111-1111-1111-1111-111111111111',
+    college_id: '',
     holiday_date: '',
     title: '',
     holiday_type: 'COLLEGE_HOLIDAY',
@@ -17,9 +18,15 @@ export const HolidaysPage: React.FC = () => {
 
   const fetchHolidays = async () => {
     try {
-      const res = await api.get('/holidays');
-      if (res.data.success) {
-        setHolidays(res.data.data);
+      const [hRes, cRes] = await Promise.all([
+        api.get('/holidays'),
+        api.get('/catalog/colleges'),
+      ]);
+      if (hRes.data.success) {
+        setHolidays(hRes.data.data);
+      }
+      if (cRes.data.success) {
+        setColleges(cRes.data.data);
       }
     } catch (err) {
       console.error(err);
@@ -30,10 +37,24 @@ export const HolidaysPage: React.FC = () => {
     fetchHolidays();
   }, []);
 
+  const openAddModal = () => {
+    setFormData({
+      college_id: colleges[0]?.id || '',
+      holiday_date: '',
+      title: '',
+      holiday_type: 'COLLEGE_HOLIDAY',
+      is_service_disabled: true,
+    });
+    setModalOpen(true);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/holidays', formData);
+      await api.post('/holidays', {
+        ...formData,
+        college_id: formData.college_id || colleges[0]?.id,
+      });
       setModalOpen(false);
       fetchHolidays();
     } catch (err) {

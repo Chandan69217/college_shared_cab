@@ -5,6 +5,7 @@ export declare class PlanRepository {
     static findById(id: string): Promise<SubscriptionPlan | null>;
     static create(plan: Partial<SubscriptionPlan>): Promise<SubscriptionPlan>;
     static update(id: string, updates: Partial<SubscriptionPlan>): Promise<SubscriptionPlan>;
+    static delete(id: string): Promise<void>;
 }
 export declare class SubscriptionRepository {
     private static getClient;

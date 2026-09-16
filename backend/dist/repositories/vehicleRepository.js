@@ -12,7 +12,7 @@ class VehicleRepository {
     static async findAll(collegeId) {
         let query = this.getClient()
             .from('vehicles')
-            .select('*')
+            .select('*, college:colleges(*)')
             .order('vehicle_number');
         if (collegeId) {
             query = query.eq('college_id', collegeId);
@@ -25,7 +25,7 @@ class VehicleRepository {
     static async findById(id) {
         const { data, error } = await this.getClient()
             .from('vehicles')
-            .select('*')
+            .select('*, college:colleges(*)')
             .eq('id', id)
             .maybeSingle();
         if (error)

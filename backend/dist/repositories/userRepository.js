@@ -231,33 +231,47 @@ class UserRepository {
     }
     static async deleteDriver(userId) {
         const client = this.getClient();
-        // Check assigned active routes
-        const { data: routes } = await client
+        // 1. Automatically unassign driver from any assigned routes
+        await client
             .from('routes')
-            .select('id, name')
-            .eq('default_driver_id', userId)
-            .eq('is_active', true);
-        if (routes && routes.length > 0) {
-            const err = new Error(`Cannot delete driver: Assigned as default driver for active route "${routes[0].name}". Please reassign the route first or update driver status to INACTIVE.`);
-            err.statusCode = 409;
-            err.code = 'ACTIVE_RELATIONSHIP_EXISTS';
-            throw err;
-        }
-        // Check active scheduled trips
-        const { data: trips } = await client
+            .update({ default_driver_id: null })
+            .eq('default_driver_id', userId);
+        // 2. Automatically unassign driver from any assigned trips
+        await client
             .from('trips')
-            .select('id, trip_date')
-            .eq('driver_id', userId)
-            .in('status', ['SCHEDULED', 'IN_PROGRESS']);
-        if (trips && trips.length > 0) {
-            const err = new Error(`Cannot delete driver: Driver has ${trips.length} active or scheduled trip(s). Reassign trips or change driver status to ON_LEAVE/INACTIVE instead.`);
-            err.statusCode = 409;
-            err.code = 'ACTIVE_RELATIONSHIP_EXISTS';
-            throw err;
+            .update({ driver_id: null })
+            .eq('driver_id', userId);
+        // 3. Automatically unassign driver from delay reports
+        await client
+            .from('delay_reports')
+            .update({ driver_id: null })
+            .eq('driver_id', userId);
+        // 4. Automatically unassign driver verification from passenger manifest & QR logs
+        await client
+            .from('trip_passengers')
+            .update({ verified_by_driver_id: null })
+            .eq('verified_by_driver_id', userId);
+        await client
+            .from('qr_authentication_logs')
+            .update({ driver_id: null })
+            .eq('driver_id', userId);
+        await client
+            .from('ratings')
+            .update({ driver_id: null })
+            .eq('driver_id', userId);
+        // 5. Clean up live GPS tracking records for this driver
+        await client.from('vehicle_current_locations').delete().eq('driver_id', userId);
+        await client.from('vehicle_locations').delete().eq('driver_id', userId);
+        await client.from('vehicle_location_history').delete().eq('driver_id', userId);
+        // 6. Delete driver profile and user account
+        const { error: profileError } = await client.from('driver_profiles').delete().eq('id', userId);
+        if (profileError) {
+            console.warn('Driver profile deletion notice:', profileError.message);
         }
-        // Safe delete
-        await client.from('driver_profiles').delete().eq('id', userId);
-        await client.from('users').delete().eq('id', userId);
+        const { error: userError } = await client.from('users').delete().eq('id', userId);
+        if (userError) {
+            throw new Error(`Delete driver user error: ${userError.message}`);
+        }
     }
 }
 exports.UserRepository = UserRepository;

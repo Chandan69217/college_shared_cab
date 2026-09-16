@@ -30,6 +30,9 @@ class DailyPassModel {
   });
 
   factory DailyPassModel.fromJson(Map<String, dynamic> json) {
+    final routeData = json['route'] ?? (json['trip'] != null ? json['trip']['route'] : null);
+    final pickupData = json['pickup_point'] ?? json['pickup'];
+
     return DailyPassModel(
       id: json['id'] ?? '',
       studentId: json['student_id'] ?? '',
@@ -42,8 +45,8 @@ class DailyPassModel {
       authTokenHash: json['auth_token_hash'] ?? '',
       validUntil: json['valid_until'] ?? '',
       status: json['status'] ?? 'ACTIVE',
-      route: json['route'],
-      pickup: json['pickup'],
+      route: routeData is Map<String, dynamic> ? routeData : null,
+      pickup: pickupData is Map<String, dynamic> ? pickupData : null,
     );
   }
 }

@@ -22,6 +22,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
+import { LiveTrackingPage } from './pages/LiveTrackingPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, token, isLoading } = useAuth();
@@ -69,6 +70,7 @@ export const App: React.FC = () => {
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="bookings" element={<BookingsPage />} />
             <Route path="trips" element={<TripsPage />} />
+            <Route path="live-tracking" element={<LiveTrackingPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="holidays" element={<HolidaysPage />} />

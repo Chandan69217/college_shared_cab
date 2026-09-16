@@ -1,14 +1,27 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../storage/storage_service.dart';
 
 class AppConstants {
   static const String appName = 'CampusRide';
 
-  /// Base API URL dynamically configured based on platform:
-  /// - Android Emulator: Uses `http://10.0.2.2:5000/api/v1` (host loopback)
-  /// - Web / iOS Simulator / Desktop: Uses `http://127.0.0.1:5000/api/v1`
-  /// - Physical device via USB: Run `adb reverse tcp:5000 tcp:5000` or use your PC's Wi-Fi IP (e.g., `http://192.168.1.X:5000/api/v1`)
+  /// Base API URL dynamically configured based on platform & environment:
+  /// 1. `--dart-define=API_URL=...` or `--dart-define=API_BASE_URL=...`
+  /// 2. User-saved custom API URL in SharedPreferences (for physical phone testing over LAN)
+  /// 3. Android Emulator: `http://10.0.2.2:5000/api/v1`
+  /// 4. Web / iOS / Desktop: `http://127.0.0.1:5000/api/v1`
   static String get apiBaseUrl {
+    const dartDefineUrl = String.fromEnvironment('API_URL',
+        defaultValue: String.fromEnvironment('API_BASE_URL', defaultValue: ''));
+    if (dartDefineUrl.isNotEmpty) {
+      return dartDefineUrl;
+    }
+
+    final customUrl = StorageService.getCustomApiUrl();
+    if (customUrl != null && customUrl.trim().isNotEmpty) {
+      return customUrl.trim();
+    }
+
     if (kIsWeb) {
       return 'http://127.0.0.1:5000/api/v1';
     }
@@ -24,4 +37,5 @@ class AppConstants {
   static const String tokenKey = 'campus_ride_auth_token';
   static const String userKey = 'campus_ride_user_data';
   static const String roleKey = 'campus_ride_user_role';
+  static const String customApiUrlKey = 'campus_ride_custom_api_url';
 }

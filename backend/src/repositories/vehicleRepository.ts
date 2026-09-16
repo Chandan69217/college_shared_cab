@@ -11,7 +11,7 @@ export class VehicleRepository {
   public static async findAll(collegeId?: string): Promise<Vehicle[]> {
     let query = this.getClient()
       .from('vehicles')
-      .select('*')
+      .select('*, college:colleges(*)')
       .order('vehicle_number');
 
     if (collegeId) {
@@ -26,7 +26,7 @@ export class VehicleRepository {
   public static async findById(id: string): Promise<Vehicle | null> {
     const { data, error } = await this.getClient()
       .from('vehicles')
-      .select('*')
+      .select('*, college:colleges(*)')
       .eq('id', id)
       .maybeSingle();
 

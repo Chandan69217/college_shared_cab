@@ -387,13 +387,13 @@ export declare const createVehicleSchema: z.ZodObject<{
     fitness_validity: string;
 }>;
 export declare const createPlanSchema: z.ZodObject<{
-    college_id: z.ZodString;
-    tier: z.ZodEnum<["BASIC", "STANDARD", "PREMIUM"]>;
+    college_id: z.ZodOptional<z.ZodString>;
+    tier: z.ZodDefault<z.ZodEnum<["BASIC", "STANDARD", "PREMIUM"]>>;
     name: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
     price: z.ZodNumber;
-    validity_days: z.ZodNumber;
-    ride_count_total: z.ZodNumber;
+    validity_days: z.ZodDefault<z.ZodNumber>;
+    ride_count_total: z.ZodDefault<z.ZodNumber>;
     is_unlimited_rides: z.ZodDefault<z.ZodBoolean>;
     priority_booking: z.ZodDefault<z.ZodBoolean>;
     one_way_allowed: z.ZodDefault<z.ZodBoolean>;
@@ -401,9 +401,10 @@ export declare const createPlanSchema: z.ZodObject<{
     cancellation_hours_limit: z.ZodDefault<z.ZodNumber>;
     cancellation_fee_percentage: z.ZodDefault<z.ZodNumber>;
     additional_ride_charge: z.ZodDefault<z.ZodNumber>;
+    status: z.ZodDefault<z.ZodEnum<["ACTIVE", "INACTIVE", "ARCHIVED"]>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
-    college_id: string;
+    status: "ACTIVE" | "INACTIVE" | "ARCHIVED";
     tier: "BASIC" | "STANDARD" | "PREMIUM";
     price: number;
     validity_days: number;
@@ -415,15 +416,66 @@ export declare const createPlanSchema: z.ZodObject<{
     cancellation_hours_limit: number;
     cancellation_fee_percentage: number;
     additional_ride_charge: number;
+    college_id?: string | undefined;
     description?: string | undefined;
 }, {
     name: string;
-    college_id: string;
-    tier: "BASIC" | "STANDARD" | "PREMIUM";
     price: number;
-    validity_days: number;
-    ride_count_total: number;
+    status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" | undefined;
+    college_id?: string | undefined;
     description?: string | undefined;
+    tier?: "BASIC" | "STANDARD" | "PREMIUM" | undefined;
+    validity_days?: number | undefined;
+    ride_count_total?: number | undefined;
+    is_unlimited_rides?: boolean | undefined;
+    priority_booking?: boolean | undefined;
+    one_way_allowed?: boolean | undefined;
+    round_trip_allowed?: boolean | undefined;
+    cancellation_hours_limit?: number | undefined;
+    cancellation_fee_percentage?: number | undefined;
+    additional_ride_charge?: number | undefined;
+}>;
+export declare const updatePlanSchema: z.ZodObject<{
+    college_id: z.ZodOptional<z.ZodOptional<z.ZodString>>;
+    tier: z.ZodOptional<z.ZodDefault<z.ZodEnum<["BASIC", "STANDARD", "PREMIUM"]>>>;
+    name: z.ZodOptional<z.ZodString>;
+    description: z.ZodOptional<z.ZodOptional<z.ZodString>>;
+    price: z.ZodOptional<z.ZodNumber>;
+    validity_days: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
+    ride_count_total: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
+    is_unlimited_rides: z.ZodOptional<z.ZodDefault<z.ZodBoolean>>;
+    priority_booking: z.ZodOptional<z.ZodDefault<z.ZodBoolean>>;
+    one_way_allowed: z.ZodOptional<z.ZodDefault<z.ZodBoolean>>;
+    round_trip_allowed: z.ZodOptional<z.ZodDefault<z.ZodBoolean>>;
+    cancellation_hours_limit: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
+    cancellation_fee_percentage: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
+    additional_ride_charge: z.ZodOptional<z.ZodDefault<z.ZodNumber>>;
+    status: z.ZodOptional<z.ZodDefault<z.ZodEnum<["ACTIVE", "INACTIVE", "ARCHIVED"]>>>;
+}, "strip", z.ZodTypeAny, {
+    name?: string | undefined;
+    status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" | undefined;
+    college_id?: string | undefined;
+    description?: string | undefined;
+    tier?: "BASIC" | "STANDARD" | "PREMIUM" | undefined;
+    price?: number | undefined;
+    validity_days?: number | undefined;
+    ride_count_total?: number | undefined;
+    is_unlimited_rides?: boolean | undefined;
+    priority_booking?: boolean | undefined;
+    one_way_allowed?: boolean | undefined;
+    round_trip_allowed?: boolean | undefined;
+    cancellation_hours_limit?: number | undefined;
+    cancellation_fee_percentage?: number | undefined;
+    additional_ride_charge?: number | undefined;
+}, {
+    name?: string | undefined;
+    status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" | undefined;
+    college_id?: string | undefined;
+    description?: string | undefined;
+    tier?: "BASIC" | "STANDARD" | "PREMIUM" | undefined;
+    price?: number | undefined;
+    validity_days?: number | undefined;
+    ride_count_total?: number | undefined;
     is_unlimited_rides?: boolean | undefined;
     priority_booking?: boolean | undefined;
     one_way_allowed?: boolean | undefined;
@@ -445,15 +497,31 @@ export declare const subscribePlanSchema: z.ZodObject<{
     payment_method?: "UPI" | "DEBIT_CARD" | "CREDIT_CARD" | "NET_BANKING" | "WALLET" | undefined;
     auto_renew?: boolean | undefined;
 }>;
+export declare const checkAvailabilitySchema: z.ZodObject<{
+    route_id: z.ZodString;
+    pickup_point_id: z.ZodString;
+    drop_point_id: z.ZodOptional<z.ZodString>;
+}, "strip", z.ZodTypeAny, {
+    pickup_point_id: string;
+    route_id: string;
+    drop_point_id?: string | undefined;
+}, {
+    pickup_point_id: string;
+    route_id: string;
+    drop_point_id?: string | undefined;
+}>;
 export declare const createBookingSchema: z.ZodObject<{
     trip_id: z.ZodString;
     pickup_point_id: z.ZodString;
+    drop_point_id: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     pickup_point_id: string;
     trip_id: string;
+    drop_point_id?: string | undefined;
 }, {
     pickup_point_id: string;
     trip_id: string;
+    drop_point_id?: string | undefined;
 }>;
 export declare const cancelBookingSchema: z.ZodObject<{
     reason: z.ZodString;
@@ -479,21 +547,27 @@ export declare const verifyQrScanSchema: z.ZodObject<{
     client_longitude?: number | undefined;
 }>;
 export declare const updateGpsLocationSchema: z.ZodObject<{
-    trip_id: z.ZodString;
+    trip_id: z.ZodOptional<z.ZodString>;
     latitude: z.ZodNumber;
     longitude: z.ZodNumber;
+    accuracy: z.ZodDefault<z.ZodNumber>;
     speed: z.ZodDefault<z.ZodNumber>;
     heading: z.ZodDefault<z.ZodNumber>;
+    timestamp: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     latitude: number;
     longitude: number;
-    trip_id: string;
+    accuracy: number;
     speed: number;
     heading: number;
+    timestamp?: string | undefined;
+    trip_id?: string | undefined;
 }, {
     latitude: number;
     longitude: number;
-    trip_id: string;
+    timestamp?: string | undefined;
+    trip_id?: string | undefined;
+    accuracy?: number | undefined;
     speed?: number | undefined;
     heading?: number | undefined;
 }>;

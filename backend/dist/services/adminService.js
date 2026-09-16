@@ -7,6 +7,7 @@ const userRepository_1 = require("../repositories/userRepository");
 const reportRepository_1 = require("../repositories/reportRepository");
 const vehicleRepository_1 = require("../repositories/vehicleRepository");
 const routeRepository_1 = require("../repositories/routeRepository");
+const tripRepository_1 = require("../repositories/tripRepository");
 const collegeRepository_1 = require("../repositories/collegeRepository");
 const supabaseClient_1 = require("../database/supabaseClient");
 class AdminService {
@@ -258,7 +259,10 @@ class AdminService {
      * Update route and stop sequence in Supabase
      */
     static async updateRoute(routeId, updates, stops) {
-        return routeRepository_1.RouteRepository.update(routeId, updates, stops);
+        const updated = await routeRepository_1.RouteRepository.update(routeId, updates, stops);
+        const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        await tripRepository_1.TripRepository.syncDailyTripsForDate(todayIST, routeId);
+        return updated;
     }
     /**
      * Delete route safely
@@ -372,10 +376,16 @@ class AdminService {
                 throw err;
             }
         }
+        const finalVehicleId = data.default_vehicle_id !== undefined ? data.default_vehicle_id : route.default_vehicle_id;
+        const finalDriverId = data.default_driver_id !== undefined ? data.default_driver_id : route.default_driver_id;
         const updated = await routeRepository_1.RouteRepository.update(routeId, {
-            default_vehicle_id: data.default_vehicle_id !== undefined ? data.default_vehicle_id : route.default_vehicle_id,
-            default_driver_id: data.default_driver_id !== undefined ? data.default_driver_id : route.default_driver_id,
+            default_vehicle_id: finalVehicleId,
+            default_driver_id: finalDriverId,
+            is_active: true,
         });
+        // Synchronize scheduled trips for today & future
+        const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+        await tripRepository_1.TripRepository.syncDailyTripsForDate(todayIST, routeId);
         return updated;
     }
     /**

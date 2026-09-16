@@ -8,6 +8,7 @@ const auditLog_1 = require("../middleware/auditLog");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticateJwt);
 // Student booking actions
+router.post('/check-availability', (0, rbac_1.requireRole)(['STUDENT']), bookingController_1.BookingController.checkAvailability);
 router.post('/', (0, rbac_1.requireRole)(['STUDENT']), (0, auditLog_1.auditLog)('BOOK_RIDE', 'bookings'), bookingController_1.BookingController.bookRide);
 router.post('/:id/cancel', (0, rbac_1.requireRole)(['STUDENT']), (0, auditLog_1.auditLog)('CANCEL_BOOKING', 'bookings'), bookingController_1.BookingController.cancelBooking);
 // Admin view all bookings

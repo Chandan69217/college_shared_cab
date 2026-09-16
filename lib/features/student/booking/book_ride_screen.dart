@@ -14,11 +14,11 @@ class BookRideScreen extends StatefulWidget {
 
 class _BookRideScreenState extends State<BookRideScreen> {
   List<RouteModel> _routes = [];
-  List<PickupPointModel> _pickupPoints = [];
   List<TripModel> _trips = [];
   
   RouteModel? _selectedRoute;
-  PickupPointModel? _selectedPickup;
+  RouteStopModel? _selectedPickupStop;
+  RouteStopModel? _selectedDropStop;
   TripModel? _selectedTrip;
   
   bool _isLoading = true;
@@ -28,22 +28,22 @@ class _BookRideScreenState extends State<BookRideScreen> {
   Future<void> _loadData() async {
     try {
       final routesRes = await apiClient.get('/catalog/routes');
-      final pickupsRes = await apiClient.get('/catalog/pickup-points');
       final tripsRes = await apiClient.get('/trips');
 
       if (mounted) {
         final List rList = routesRes.data['data'] ?? [];
-        final List pList = pickupsRes.data['data'] ?? [];
         final List tList = tripsRes.data['data'] ?? [];
 
-        setState(() {
-          _routes = rList.map((r) => RouteModel.fromJson(r)).toList();
-          _pickupPoints = pList.map((p) => PickupPointModel.fromJson(p)).toList();
-          _trips = tList.map((t) => TripModel.fromJson(t)).toList();
+        final routes = rList.map((r) => RouteModel.fromJson(r)).toList();
+        final trips = tList.map((t) => TripModel.fromJson(t)).toList();
 
-          if (_routes.isNotEmpty) _selectedRoute = _routes.first;
-          if (_pickupPoints.isNotEmpty) _selectedPickup = _pickupPoints.first;
-          if (_trips.isNotEmpty) _selectedTrip = _trips.first;
+        setState(() {
+          _routes = routes;
+          _trips = trips;
+
+          if (_routes.isNotEmpty) {
+            _onRouteChanged(_routes.first);
+          }
 
           _isLoading = false;
         });
@@ -53,6 +53,98 @@ class _BookRideScreenState extends State<BookRideScreen> {
     }
   }
 
+  void _onRouteChanged(RouteModel route) {
+    _selectedRoute = route;
+    _selectedPickupStop = route.stops.isNotEmpty ? route.stops.first : null;
+    _updateDropStops();
+    _autoSelectFirstEligibleTrip();
+  }
+
+  void _onPickupChanged(RouteStopModel pickup) {
+    setState(() {
+      _selectedPickupStop = pickup;
+      _updateDropStops();
+      _autoSelectFirstEligibleTrip();
+    });
+  }
+
+  void _updateDropStops() {
+    if (_selectedRoute == null || _selectedPickupStop == null) {
+      _selectedDropStop = null;
+      return;
+    }
+    final eligibleDrops = _selectedRoute!.stops
+        .where((s) => s.sequenceOrder > _selectedPickupStop!.sequenceOrder)
+        .toList();
+
+    if (eligibleDrops.isNotEmpty) {
+      _selectedDropStop = eligibleDrops.last; // Default to final stop
+    } else {
+      _selectedDropStop = null;
+    }
+  }
+
+  void _autoSelectFirstEligibleTrip() {
+    final routeTrips = _trips.where((t) => t.routeId == _selectedRoute?.id).toList();
+    TripModel? eligible;
+    for (final t in routeTrips) {
+      final info = _evaluateTripEligibility(t);
+      if (info.isEligible) {
+        eligible = t;
+        break;
+      }
+    }
+    _selectedTrip = eligible;
+  }
+
+  _TripEligibility _evaluateTripEligibility(TripModel trip) {
+    final seatsLeft = trip.maxCapacity - trip.bookedSeats;
+    if (seatsLeft <= 0) {
+      return _TripEligibility(
+        isEligible: false,
+        badgeText: 'FULL (0 SEATS)',
+        badgeColor: AppColors.accentRose,
+        reason: 'Vehicle has reached maximum passenger capacity.',
+      );
+    }
+
+    if (trip.status == 'COMPLETED' || trip.status == 'CANCELLED') {
+      return _TripEligibility(
+        isEligible: false,
+        badgeText: trip.status,
+        badgeColor: AppColors.textMuted,
+        reason: 'This trip is no longer active for bookings.',
+      );
+    }
+
+    if (trip.status == 'IN_PROGRESS' && _selectedPickupStop != null) {
+      final pickupSeq = _selectedPickupStop!.sequenceOrder;
+      final cabSeq = trip.currentStopSequence;
+      if (cabSeq >= pickupSeq) {
+        return _TripEligibility(
+          isEligible: false,
+          badgeText: 'PASSED STOP #$pickupSeq',
+          badgeColor: AppColors.accentRose,
+          reason: 'Cab already reached Stop #$cabSeq and cannot pick up at Stop #$pickupSeq.',
+        );
+      } else {
+        return _TripEligibility(
+          isEligible: true,
+          badgeText: '$seatsLeft SEATS • ON ROUTE (STOP #$cabSeq)',
+          badgeColor: const Color(0xFF10B981),
+          reason: 'Cab is currently active at Stop #$cabSeq and en route to your stop.',
+        );
+      }
+    }
+
+    return _TripEligibility(
+      isEligible: true,
+      badgeText: '$seatsLeft SEATS LEFT',
+      badgeColor: AppColors.primaryLight,
+      reason: 'Scheduled departure as planned.',
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -60,17 +152,25 @@ class _BookRideScreenState extends State<BookRideScreen> {
   }
 
   Future<void> _handleBookRide() async {
-    if (_selectedTrip == null || _selectedPickup == null) {
+    if (_selectedTrip == null || _selectedPickupStop == null) {
       setState(() {
-        _errorMessage = 'Please select a valid pickup stop and trip slot.';
+        _errorMessage = 'Please select a valid pickup stop and eligible cab trip.';
       });
       return;
     }
 
-    // Check geofence 10km limit
-    if (_selectedPickup!.distanceToCollegeKm > 10.0 && !_selectedPickup!.isApproved) {
+    final pickupPoint = _selectedPickupStop!.pickupPoint;
+    if (pickupPoint != null && pickupPoint.distanceToCollegeKm > 10.0 && !pickupPoint.isApproved) {
       setState(() {
-        _errorMessage = 'Selected pickup is outside the 10km college service area (${_selectedPickup!.distanceToCollegeKm} km).';
+        _errorMessage = 'Selected pickup is outside the 10km college service area (${pickupPoint.distanceToCollegeKm} km).';
+      });
+      return;
+    }
+
+    final eligibility = _evaluateTripEligibility(_selectedTrip!);
+    if (!eligibility.isEligible) {
+      setState(() {
+        _errorMessage = eligibility.reason;
       });
       return;
     }
@@ -81,10 +181,13 @@ class _BookRideScreenState extends State<BookRideScreen> {
     });
 
     try {
-      final res = await apiClient.post('/bookings', data: {
+      final payload = {
         'trip_id': _selectedTrip!.id,
-        'pickup_point_id': _selectedPickup!.id,
-      });
+        'pickup_point_id': _selectedPickupStop!.pickupPointId,
+        if (_selectedDropStop != null) 'drop_point_id': _selectedDropStop!.pickupPointId,
+      };
+
+      final res = await apiClient.post('/bookings', data: payload);
 
       if (res.data['success'] == true && mounted) {
         final data = res.data['data'];
@@ -105,13 +208,31 @@ class _BookRideScreenState extends State<BookRideScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Seat #${data['booking']?['seat_number'] ?? 1} reserved successfully.',
+                  'Seat #${data['booking']?['seat_number'] ?? 1} reserved successfully on Route "${_selectedRoute?.name}".',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Pickup: Stop #${_selectedPickupStop!.sequenceOrder} – ${_selectedPickupStop!.pickupPoint?.name ?? 'Assigned Stop'}',
+                          style: const TextStyle(color: Colors.white, fontSize: 11)),
+                      if (_selectedDropStop != null)
+                        Text('Drop: Stop #${_selectedDropStop!.sequenceOrder} – ${_selectedDropStop!.pickupPoint?.name ?? 'Destination'}',
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
                 const Text(
                   'Your daily dynamic travel pass with signed QR authentication has been generated.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
               ],
             ),
@@ -140,6 +261,12 @@ class _BookRideScreenState extends State<BookRideScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final routeTrips = _trips.where((t) => t.routeId == _selectedRoute?.id).toList();
+    final stops = _selectedRoute?.stops ?? [];
+    final dropOptions = _selectedPickupStop != null
+        ? stops.where((s) => s.sequenceOrder > _selectedPickupStop!.sequenceOrder).toList()
+        : <RouteStopModel>[];
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -176,7 +303,7 @@ class _BookRideScreenState extends State<BookRideScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Route Selector Card
+                  // 1. Route Selector Card
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -188,7 +315,7 @@ class _BookRideScreenState extends State<BookRideScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '1. Select Commute Route',
+                          '1. Select Commute Route Corridor',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                         const SizedBox(height: 10),
@@ -198,31 +325,26 @@ class _BookRideScreenState extends State<BookRideScreen> {
                           dropdownColor: AppColors.surface,
                           style: const TextStyle(color: Colors.white, fontSize: 13),
                           decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.route_outlined, size: 20),
+                            prefixIcon: Icon(Icons.alt_route_rounded, size: 20),
                           ),
                           items: _routes.map((r) {
                             return DropdownMenuItem(
                               value: r,
-                              child: Text(r.name, overflow: TextOverflow.ellipsis),
+                              child: Text('${r.code} - ${r.name}', overflow: TextOverflow.ellipsis),
                             );
                           }).toList(),
                           onChanged: (val) {
-                            if (val != null) setState(() => _selectedRoute = val);
+                            if (val != null) {
+                              setState(() => _onRouteChanged(val));
+                            }
                           },
                         ),
-                        if (_selectedRoute != null) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            _selectedRoute!.description ?? '',
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                          ),
-                        ],
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Pickup Point Selector Card
+                  // 2. Pickup Point Selector Card
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -239,51 +361,39 @@ class _BookRideScreenState extends State<BookRideScreen> {
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'Pre-defined pickup locations strictly within 10 km of college campus.',
+                          'Select your boarding stop along this route corridor.',
                           style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
                         ),
                         const SizedBox(height: 10),
-                        DropdownButtonFormField<PickupPointModel>(
-                          value: _selectedPickup,
-                          hint: const Text('No pickup stops found', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                        DropdownButtonFormField<RouteStopModel>(
+                          value: _selectedPickupStop,
+                          hint: const Text('No stops available on this route', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                           dropdownColor: AppColors.surface,
                           style: const TextStyle(color: Colors.white, fontSize: 13),
                           decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                            prefixIcon: Icon(Icons.location_on_rounded, size: 20),
                           ),
-                          items: _pickupPoints.map((p) {
-                            final isOver = p.distanceToCollegeKm > 10.0;
+                          items: stops.map((s) {
+                            final pName = s.pickupPoint?.name ?? 'Stop #${s.sequenceOrder}';
+                            final dist = s.pickupPoint?.distanceToCollegeKm ?? 0.0;
                             return DropdownMenuItem(
-                              value: p,
+                              value: s,
                               child: Text(
-                                '${p.name} (${p.distanceToCollegeKm} km)${isOver ? ' [>10km]' : ''}',
+                                'Stop #${s.sequenceOrder}: $pName (${dist.toStringAsFixed(1)} km)',
                                 overflow: TextOverflow.ellipsis,
                               ),
                             );
                           }).toList(),
                           onChanged: (val) {
-                            if (val != null) setState(() => _selectedPickup = val);
+                            if (val != null) _onPickupChanged(val);
                           },
                         ),
-                        if (_selectedPickup != null) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(Icons.near_me_outlined, size: 14, color: AppColors.primary),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${_selectedPickup!.distanceToCollegeKm} km from college campus',
-                                style: const TextStyle(color: AppColors.primaryLight, fontSize: 11, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ],
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Available Scheduled Trips & Live Capacity Card
+                  // 3. Drop Point Selector Card
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -295,103 +405,179 @@ class _BookRideScreenState extends State<BookRideScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '3. Trip Slot & Real-Time Capacity',
+                          '3. Select Destination / Drop Point',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                         ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Filtered strictly to stops downstream from your pickup stop.',
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                        ),
                         const SizedBox(height: 10),
-                        if (_trips.isEmpty)
+                        DropdownButtonFormField<RouteStopModel>(
+                          value: _selectedDropStop,
+                          hint: const Text('College Main Campus Terminal', style: TextStyle(color: AppColors.primaryLight, fontSize: 13)),
+                          dropdownColor: AppColors.surface,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.flag_rounded, size: 20),
+                          ),
+                          items: dropOptions.map((s) {
+                            final pName = s.pickupPoint?.name ?? 'Stop #${s.sequenceOrder}';
+                            return DropdownMenuItem(
+                              value: s,
+                              child: Text(
+                                'Stop #${s.sequenceOrder}: $pName',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedDropStop = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 4. Available Cabs & Live Stop Progression Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceCard,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFF374151)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              '4. Available Cabs & Trips',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            Text(
+                              '${routeTrips.length} Cabs Scheduled',
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        if (routeTrips.isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             child: Text(
-                              'No scheduled trips available for booking currently.',
+                              'No scheduled cabs available on this route corridor for today.',
                               style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                             ),
                           )
                         else
-                          ..._trips.map((trip) {
+                          ...routeTrips.map((trip) {
+                            final eligibility = _evaluateTripEligibility(trip);
+                            final isEligible = eligibility.isEligible;
                             final isSelected = _selectedTrip?.id == trip.id;
-                            final seatsLeft = trip.maxCapacity - trip.bookedSeats;
-                            final isFull = seatsLeft <= 0;
+                            final vehPlate = trip.vehicle?['vehicle_number']?.toString() ??
+                                trip.vehicle?['number']?.toString() ??
+                                trip.vehicle?['model']?.toString() ??
+                                'Shared Shuttle';
+                            final driverName = trip.driver?['full_name']?.toString() ??
+                                trip.driver?['name']?.toString() ??
+                                'Assigned Driver';
 
                             return GestureDetector(
-                              onTap: isFull ? null : () => setState(() => _selectedTrip = trip),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary.withOpacity(0.12)
-                                      : AppColors.surface,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
+                              onTap: isEligible ? () => setState(() => _selectedTrip = trip) : null,
+                              child: Opacity(
+                                opacity: isEligible ? 1.0 : 0.6,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppColors.primary
-                                        : const Color(0xFF374151),
+                                        ? AppColors.primary.withOpacity(0.12)
+                                        : AppColors.surface,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : const Color(0xFF374151),
+                                      width: isSelected ? 1.5 : 1.0,
+                                    ),
                                   ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          trip.tripType == 'MORNING_PICKUP'
-                                              ? Icons.wb_sunny_outlined
-                                              : Icons.nightlight_round_outlined,
-                                          color: AppColors.primary,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              trip.tripType == 'MORNING_PICKUP'
-                                                  ? 'Morning Commute (07:30 AM)'
-                                                  : 'Evening Return (05:00 PM)',
-                                              style: const TextStyle(
-                                                color: Colors.white,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                trip.tripType == 'MORNING_PICKUP'
+                                                    ? Icons.wb_sunny_rounded
+                                                    : Icons.nightlight_round,
+                                                color: isEligible ? AppColors.primary : AppColors.textMuted,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    '$vehPlate • $driverName',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '${trip.scheduledDepartureTime} • ${trip.tripType.replaceAll('_', ' ')}',
+                                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: eligibility.badgeColor.withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              eligibility.badgeText,
+                                              style: TextStyle(
+                                                color: eligibility.badgeColor,
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 12,
+                                                fontSize: 10,
                                               ),
                                             ),
-                                            Text(
-                                              '${trip.tripDate} • Capacity: ${trip.maxCapacity} Pax',
-                                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
-                                            ),
-                                          ],
+                                          ),
+                                        ],
+                                      ),
+                                      if (!isEligible) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          eligibility.reason,
+                                          style: const TextStyle(color: AppColors.accentRose, fontSize: 10),
                                         ),
                                       ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: isFull
-                                            ? AppColors.accentRose.withOpacity(0.15)
-                                            : AppColors.primary.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        isFull ? 'FULL' : '$seatsLeft SEATS LEFT',
-                                        style: TextStyle(
-                                          color: isFull ? AppColors.accentRose : AppColors.primaryLight,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
-                          }).toList(),
+                          }),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
 
                   ElevatedButton(
-                    onPressed: _isBooking ? null : _handleBookRide,
+                    onPressed: _isBooking || _selectedTrip == null ? null : _handleBookRide,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -408,4 +594,18 @@ class _BookRideScreenState extends State<BookRideScreen> {
             ),
     );
   }
+}
+
+class _TripEligibility {
+  final bool isEligible;
+  final String badgeText;
+  final Color badgeColor;
+  final String reason;
+
+  _TripEligibility({
+    required this.isEligible,
+    required this.badgeText,
+    required this.badgeColor,
+    required this.reason,
+  });
 }

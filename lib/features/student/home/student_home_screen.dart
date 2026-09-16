@@ -13,11 +13,18 @@ class StudentHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<StudentHomeScreen> createState() => _StudentHomeScreenState();
 }
 
-class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
+class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   Map<String, dynamic>? _dashboardData;
   bool _isLoading = true;
 
-  Future<void> _fetchDashboard() async {
+  Future<void> _fetchDashboard({bool isInitial = false}) async {
+    if (isInitial && _dashboardData == null) {
+      if (mounted) setState(() => _isLoading = true);
+    }
     try {
       final res = await apiClient.get('/students/dashboard');
       if (res.data['success'] == true && mounted) {
@@ -34,11 +41,12 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchDashboard();
+    _fetchDashboard(isInitial: true);
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final sub = _dashboardData?['activeSubscription'];
@@ -342,7 +350,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    todaysBooking['pickup']?['name'] ?? 'Designated Pickup',
+                                    todaysBooking['pickup_point']?['name'] ?? todaysBooking['pickup']?['name'] ?? 'Designated Pickup',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,

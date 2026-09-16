@@ -19,6 +19,9 @@ const reportRoutes_1 = __importDefault(require("./reportRoutes"));
 const holidayRoutes_1 = __importDefault(require("./holidayRoutes"));
 const profileRoutes_1 = __importDefault(require("./profileRoutes"));
 const router = (0, express_1.Router)();
+const auth_1 = require("../middleware/auth");
+const rbac_1 = require("../middleware/rbac");
+const adminController_1 = require("../controllers/adminController");
 router.use('/auth', authRoutes_1.default);
 router.use('/profile', profileRoutes_1.default);
 router.use('/students', studentRoutes_1.default);
@@ -33,5 +36,7 @@ router.use('/payments', paymentRoutes_1.default);
 router.use('/complaints', complaintRoutes_1.default);
 router.use('/reports', reportRoutes_1.default);
 router.use('/holidays', holidayRoutes_1.default);
+// Root alias for admin subscriptions
+router.get('/subscriptions', auth_1.authenticateJwt, (0, rbac_1.requireRole)(['ADMIN']), adminController_1.AdminController.getSubscriptions);
 exports.default = router;
 //# sourceMappingURL=index.js.map

@@ -1,4 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  GoogleMap,
+  useJsApiLoader,
+  Marker,
+  Polyline,
+} from '@react-google-maps/api';
 import {
   Route as RouteIcon,
   Clock,
@@ -14,17 +20,20 @@ import {
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
+  Navigation,
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { api, getApiErrorMessage } from '../services/api';
 import { Route, Vehicle, User, PickupPoint } from '../types';
+import { GOOGLE_MAPS_API_KEY, MAP_LIBRARIES, DARK_MAP_STYLE } from '../config/maps';
 
 export const RoutesPage: React.FC = () => {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<User[]>([]);
   const [pickupPoints, setPickupPoints] = useState<PickupPoint[]>([]);
+  const [colleges, setColleges] = useState<any[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -37,7 +46,7 @@ export const RoutesPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
-    college_id: '11111111-1111-1111-1111-111111111111',
+    college_id: '',
     name: '',
     code: '',
     description: '',
@@ -54,17 +63,19 @@ export const RoutesPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [rRes, vRes, dRes, pRes] = await Promise.all([
+      const [rRes, vRes, dRes, pRes, cRes] = await Promise.all([
         api.get('/catalog/routes'),
         api.get('/catalog/vehicles'),
         api.get('/admin/drivers'),
         api.get('/catalog/pickup-points'),
+        api.get('/catalog/colleges'),
       ]);
 
       if (rRes.data.success) setRoutes(rRes.data.data);
       if (vRes.data.success) setVehicles(vRes.data.data.filter((v: Vehicle) => v.status === 'ACTIVE'));
       if (dRes.data.success) setDrivers(dRes.data.data.filter((d: User) => d.profile?.status === 'ACTIVE'));
       if (pRes.data.success) setPickupPoints(pRes.data.data.filter((p: PickupPoint) => p.is_active));
+      if (cRes.data.success) setColleges(cRes.data.data);
     } catch (err: any) {
       console.error(err);
     }
@@ -76,7 +87,7 @@ export const RoutesPage: React.FC = () => {
 
   const openAddModal = () => {
     setFormData({
-      college_id: '11111111-1111-1111-1111-111111111111',
+      college_id: colleges[0]?.id || '',
       name: '',
       code: '',
       description: '',
@@ -96,7 +107,7 @@ export const RoutesPage: React.FC = () => {
   const openEditModal = (r: Route) => {
     setSelectedRoute(r);
     setFormData({
-      college_id: r.college_id,
+      college_id: r.college_id || colleges[0]?.id || '',
       name: r.name,
       code: r.code,
       description: r.description || '',
@@ -358,6 +369,23 @@ export const RoutesPage: React.FC = () => {
           {modalError && (
             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
               {modalError}
+            </div>
+          )}
+
+          {colleges.length > 1 && (
+            <div>
+              <label className="block text-slate-300 font-medium mb-1">Campus Institution</label>
+              <select
+                value={formData.college_id}
+                onChange={(e) => setFormData({ ...formData, college_id: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500"
+              >
+                {colleges.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -710,11 +738,11 @@ export const RoutesPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Stops Sequence Viewer Modal */}
+      {/* Stops Sequence & Interactive Map Viewer Modal */}
       <Modal
         isOpen={!!selectedRoute && !editModalOpen && !deleteModalOpen}
         onClose={() => setSelectedRoute(null)}
-        title={`Route Stop Sequence: ${selectedRoute?.name || ''}`}
+        title={`Route Stop Sequence & Map: ${selectedRoute?.name || ''}`}
       >
         {selectedRoute && (
           <div className="space-y-4 text-xs">
@@ -733,6 +761,68 @@ export const RoutesPage: React.FC = () => {
                 {selectedRoute.description || 'Standard commuter shuttle corridor.'}
               </p>
             </div>
+
+            {/* Interactive Route Polyline & Stops Map */}
+            {(() => {
+              const stopMarkers: { lat: number; lng: number; title: string; seq: number }[] = [];
+              const polylinePoints: { lat: number; lng: number }[] = [];
+
+              if (selectedRoute.stops && Array.isArray(selectedRoute.stops)) {
+                selectedRoute.stops.forEach((s: any, idx: number) => {
+                  if (s.pickup_point?.latitude && s.pickup_point?.longitude) {
+                    const pt = {
+                      lat: parseFloat(s.pickup_point.latitude),
+                      lng: parseFloat(s.pickup_point.longitude),
+                      title: `Stop #${s.sequence_order || idx + 1}: ${s.pickup_point.name}`,
+                      seq: s.sequence_order || idx + 1,
+                    };
+                    stopMarkers.push(pt);
+                    polylinePoints.push(pt);
+                  }
+                });
+              }
+
+              if (stopMarkers.length === 0) return null;
+
+              return (
+                <div className="h-56 rounded-xl overflow-hidden border border-slate-800 relative">
+                  <GoogleMap
+                    mapContainerStyle={{ width: '100%', height: '100%' }}
+                    center={stopMarkers[0]}
+                    zoom={13}
+                    options={{
+                      styles: DARK_MAP_STYLE,
+                      disableDefaultUI: true,
+                      zoomControl: true,
+                    }}
+                  >
+                    {stopMarkers.map((m, idx) => (
+                      <Marker
+                        key={idx}
+                        position={{ lat: m.lat, lng: m.lng }}
+                        title={m.title}
+                        label={{
+                          text: `${m.seq}`,
+                          color: '#FFFFFF',
+                          fontWeight: 'bold',
+                          fontSize: '11px',
+                        }}
+                      />
+                    ))}
+                    {polylinePoints.length > 1 && (
+                      <Polyline
+                        path={polylinePoints}
+                        options={{
+                          strokeColor: '#10B981',
+                          strokeOpacity: 0.8,
+                          strokeWeight: 4,
+                        }}
+                      />
+                    )}
+                  </GoogleMap>
+                </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <p className="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">
@@ -769,8 +859,8 @@ export const RoutesPage: React.FC = () => {
                   ★
                 </div>
                 <div>
-                  <p className="font-bold text-white">Apex Campus Destination</p>
-                  <p className="text-[10px] text-emerald-400">Estimated Arrival: 08:15 AM</p>
+                  <p className="font-bold text-white">Campus Hub Destination</p>
+                  <p className="text-[10px] text-emerald-400">Scheduled Arrival: Morning Inbound</p>
                 </div>
               </div>
             </div>

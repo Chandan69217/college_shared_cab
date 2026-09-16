@@ -32,7 +32,11 @@ function errorHandler(err, req, res, next) {
     }
     // PostgreSQL / Supabase Foreign key violation
     if (rawMsg.includes('violates foreign key constraint') || rawMsg.includes('23503')) {
-        (0, response_1.sendError)(res, 'The requested entity or reference does not exist or has been removed.', 'INVALID_REFERENCE', null, 400);
+        if (rawMsg.includes('update or delete on table') || req.method === 'DELETE') {
+            (0, response_1.sendError)(res, 'This record cannot be permanently deleted because active operational records (such as trips, bookings, or historical records) are linked to it. Please deactivate or archive it instead.', 'PROTECTED_RECORD_REFERENCE', null, 409);
+            return;
+        }
+        (0, response_1.sendError)(res, 'The referenced parent entity does not exist or has been removed.', 'INVALID_REFERENCE', null, 400);
         return;
     }
     // PostgreSQL Invalid UUID or syntax

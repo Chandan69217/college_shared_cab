@@ -22,19 +22,17 @@ class _DriverMainShellState extends State<DriverMainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      DriverDashboardScreen(onNavigateTab: _onTabSelected),
-      const DriverRouteScreen(),
-      const PassengerManifestScreen(),
-      const QrScannerScreen(),
-      const DriverProfileScreen(),
-    ];
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _currentIndex,
-        children: screens,
+        children: [
+          DriverDashboardScreen(onNavigateTab: _onTabSelected),
+          const DriverRouteScreen(),
+          const PassengerManifestScreen(),
+          QrScannerScreen(isActive: _currentIndex == 3),
+          const DriverProfileScreen(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(

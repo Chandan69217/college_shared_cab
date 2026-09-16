@@ -7,6 +7,7 @@ const collegeRepository_1 = require("../repositories/collegeRepository");
 const pickupPointRepository_1 = require("../repositories/pickupPointRepository");
 const routeRepository_1 = require("../repositories/routeRepository");
 const vehicleRepository_1 = require("../repositories/vehicleRepository");
+const supabaseClient_1 = require("../database/supabaseClient");
 class CatalogController {
     // COLLEGES
     static async getColleges(req, res, next) {
@@ -31,7 +32,8 @@ class CatalogController {
             }
             const college = await collegeRepository_1.CollegeRepository.findByCode(code);
             if (!college) {
-                return (0, response_1.sendError)(res, `No institution found with code "${code}".`, 'COLLEGE_NOT_FOUND', null, 404);
+                (0, response_1.sendError)(res, `No institution found with code "${code}".`, 'COLLEGE_NOT_FOUND', null, 404);
+                return;
             }
             (0, response_1.sendSuccess)(res, 'College found.', college);
         }
@@ -62,6 +64,23 @@ class CatalogController {
         try {
             const id = req.params.collegeId || req.params.id;
             const updated = await collegeRepository_1.CollegeRepository.update(id, req.body);
+            // If service_radius_km, latitude, or longitude changed, re-evaluate existing pickup points
+            if (req.body.service_radius_km !== undefined || req.body.latitude !== undefined || req.body.longitude !== undefined) {
+                const client = (0, supabaseClient_1.getSupabaseClient)();
+                if (client) {
+                    const { data: points } = await client.from('pickup_points').select('*').eq('college_id', id);
+                    if (points && points.length > 0) {
+                        for (const point of points) {
+                            const distanceCheck = mapsProvider_1.MapsProvider.validatePickupWithinServiceRadius(updated.latitude, updated.longitude, point.latitude, point.longitude, updated.service_radius_km);
+                            await client.from('pickup_points').update({
+                                distance_to_college_km: distanceCheck.distanceKm,
+                                is_approved: distanceCheck.isValid,
+                                updated_at: new Date().toISOString(),
+                            }).eq('id', point.id);
+                        }
+                    }
+                }
+            }
             (0, response_1.sendSuccess)(res, 'College updated successfully.', updated);
         }
         catch (err) {
@@ -93,10 +112,18 @@ class CatalogController {
         try {
             const { name, landmark, address, latitude, longitude } = req.body;
             let collegeId = req.body.college_id;
-            if (!collegeId) {
+            if (!collegeId || collegeId === '11111111-1111-1111-1111-111111111111') {
                 const colleges = await collegeRepository_1.CollegeRepository.findAll();
                 if (colleges.length > 0)
                     collegeId = colleges[0].id;
+            }
+            else {
+                const existing = await collegeRepository_1.CollegeRepository.findById(collegeId);
+                if (!existing) {
+                    const colleges = await collegeRepository_1.CollegeRepository.findAll();
+                    if (colleges.length > 0)
+                        collegeId = colleges[0].id;
+                }
             }
             const college = await collegeRepository_1.CollegeRepository.findById(collegeId);
             if (!college) {
@@ -129,7 +156,24 @@ class CatalogController {
     static async updatePickupPoint(req, res, next) {
         try {
             const id = req.params.pointId || req.params.pickupPointId || req.params.id;
-            const updated = await pickupPointRepository_1.PickupPointRepository.update(id, req.body);
+            const point = await pickupPointRepository_1.PickupPointRepository.findById(id);
+            if (!point) {
+                (0, response_1.sendError)(res, 'Pickup point not found.', 'NOT_FOUND', null, 404);
+                return;
+            }
+            const collegeId = req.body.college_id || point.college_id;
+            const college = await collegeRepository_1.CollegeRepository.findById(collegeId);
+            const updates = { ...req.body };
+            if (college) {
+                const lat = req.body.latitude !== undefined ? req.body.latitude : point.latitude;
+                const lng = req.body.longitude !== undefined ? req.body.longitude : point.longitude;
+                const distanceCheck = mapsProvider_1.MapsProvider.validatePickupWithinServiceRadius(college.latitude, college.longitude, lat, lng, college.service_radius_km);
+                updates.distance_to_college_km = distanceCheck.distanceKm;
+                if (req.body.is_approved === undefined) {
+                    updates.is_approved = distanceCheck.isValid;
+                }
+            }
+            const updated = await pickupPointRepository_1.PickupPointRepository.update(id, updates);
             (0, response_1.sendSuccess)(res, 'Pickup point updated successfully.', updated);
         }
         catch (err) {
@@ -157,13 +201,92 @@ class CatalogController {
             next(err);
         }
     }
+    static async getRouteMap(req, res, next) {
+        try {
+            const routeId = req.params.routeId || req.params.id;
+            const route = await routeRepository_1.RouteRepository.findById(routeId);
+            if (!route) {
+                return (0, response_1.sendError)(res, 'Route not found.', 'ROUTE_NOT_FOUND', null, 404);
+            }
+            let college = null;
+            if (route.college_id) {
+                college = await collegeRepository_1.CollegeRepository.findById(route.college_id);
+            }
+            const stops = (route.stops || []).map((s) => ({
+                id: s.id,
+                sequenceOrder: s.sequence_order,
+                morningPickupTime: s.morning_pickup_time,
+                eveningDropTime: s.evening_drop_time,
+                pickupPoint: s.pickup_point ? {
+                    id: s.pickup_point.id,
+                    name: s.pickup_point.name,
+                    landmark: s.pickup_point.landmark,
+                    address: s.pickup_point.address,
+                    latitude: s.pickup_point.latitude,
+                    longitude: s.pickup_point.longitude,
+                    distanceToCollegeKm: s.pickup_point.distance_to_college_km,
+                } : null,
+            }));
+            (0, response_1.sendSuccess)(res, 'Route map geometry retrieved.', {
+                id: route.id,
+                name: route.name,
+                code: route.code,
+                morningDepartureTime: route.morning_departure_time,
+                eveningDepartureTime: route.evening_departure_time,
+                estimatedDurationMins: route.estimated_duration_mins,
+                college: college ? {
+                    id: college.id,
+                    name: college.name,
+                    latitude: college.latitude,
+                    longitude: college.longitude,
+                    serviceRadiusKm: college.service_radius_km,
+                } : null,
+                stops,
+            });
+        }
+        catch (err) {
+            next(err);
+        }
+    }
     static async createRoute(req, res, next) {
         try {
             let collegeId = req.body.college_id;
-            if (!collegeId) {
+            if (!collegeId || collegeId === '11111111-1111-1111-1111-111111111111') {
                 const colleges = await collegeRepository_1.CollegeRepository.findAll();
                 if (colleges.length > 0)
                     collegeId = colleges[0].id;
+            }
+            else {
+                const existing = await collegeRepository_1.CollegeRepository.findById(collegeId);
+                if (!existing) {
+                    const colleges = await collegeRepository_1.CollegeRepository.findAll();
+                    if (colleges.length > 0)
+                        collegeId = colleges[0].id;
+                }
+            }
+            if (!collegeId) {
+                return (0, response_1.sendError)(res, 'No active college found in system. Please register a college first.', 'COLLEGE_NOT_FOUND', null, 400);
+            }
+            // Sanitize optional default_vehicle_id
+            let defaultVehicleId = req.body.default_vehicle_id || null;
+            if (defaultVehicleId) {
+                const veh = await vehicleRepository_1.VehicleRepository.findById(defaultVehicleId);
+                if (!veh)
+                    defaultVehicleId = null;
+            }
+            // Sanitize optional default_driver_id
+            let defaultDriverId = req.body.default_driver_id || null;
+            if (defaultDriverId) {
+                const client = routeRepository_1.RouteRepository['getClient'] ? routeRepository_1.RouteRepository['getClient']() : null;
+                if (client) {
+                    const { data: driverUser } = await client
+                        .from('users')
+                        .select('id')
+                        .eq('id', defaultDriverId)
+                        .maybeSingle();
+                    if (!driverUser)
+                        defaultDriverId = null;
+                }
             }
             const route = await routeRepository_1.RouteRepository.create({
                 college_id: collegeId,
@@ -173,8 +296,8 @@ class CatalogController {
                 morning_departure_time: req.body.morning_departure_time,
                 evening_departure_time: req.body.evening_departure_time,
                 estimated_duration_mins: req.body.estimated_duration_mins || 45,
-                default_vehicle_id: req.body.default_vehicle_id,
-                default_driver_id: req.body.default_driver_id,
+                default_vehicle_id: defaultVehicleId,
+                default_driver_id: defaultDriverId,
                 max_capacity: req.body.max_capacity || 6,
                 is_active: true,
             }, req.body.stops || []);
@@ -198,10 +321,21 @@ class CatalogController {
     static async createVehicle(req, res, next) {
         try {
             let collegeId = req.body.college_id;
-            if (!collegeId) {
+            if (!collegeId || collegeId === '11111111-1111-1111-1111-111111111111') {
                 const colleges = await collegeRepository_1.CollegeRepository.findAll();
                 if (colleges.length > 0)
                     collegeId = colleges[0].id;
+            }
+            else {
+                const existing = await collegeRepository_1.CollegeRepository.findById(collegeId);
+                if (!existing) {
+                    const colleges = await collegeRepository_1.CollegeRepository.findAll();
+                    if (colleges.length > 0)
+                        collegeId = colleges[0].id;
+                }
+            }
+            if (!collegeId) {
+                return (0, response_1.sendError)(res, 'No active college found in system. Please register a college first.', 'COLLEGE_NOT_FOUND', null, 400);
             }
             const vehicle = await vehicleRepository_1.VehicleRepository.create({
                 college_id: collegeId,

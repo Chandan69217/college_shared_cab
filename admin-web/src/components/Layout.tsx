@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Bell,
+  Radio,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,6 +43,7 @@ export const Layout: React.FC = () => {
     { label: 'Plans', path: '/plans', icon: CreditCard },
     { label: 'Subscriptions', path: '/subscriptions', icon: Layers },
     { label: 'Bookings', path: '/bookings', icon: CalendarCheck },
+    { label: 'Live Fleet Radar', path: '/live-tracking', icon: Radio },
     { label: 'Trips & GPS', path: '/trips', icon: Navigation },
     { label: 'Payments', path: '/payments', icon: DollarSign },
     { label: 'Complaints', path: '/complaints', icon: MessageSquare },

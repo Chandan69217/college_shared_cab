@@ -9,8 +9,13 @@ const router = (0, express_1.Router)();
 router.use(auth_1.authenticateJwt);
 router.use((0, rbac_1.requireRole)(['DRIVER']));
 router.get('/dashboard', driverController_1.DriverController.getDashboard);
+router.get('/trips', driverController_1.DriverController.getScheduledTrips);
+router.get('/trips/scheduled', driverController_1.DriverController.getScheduledTrips);
+router.get('/trips/:tripId', driverController_1.DriverController.getTripDetails);
 router.get('/trips/:tripId/manifest', driverController_1.DriverController.getManifest);
 router.post('/trips/:tripId/start', (0, auditLog_1.auditLog)('START_TRIP', 'trips'), driverController_1.DriverController.startTrip);
 router.post('/trips/:tripId/end', (0, auditLog_1.auditLog)('END_TRIP', 'trips'), driverController_1.DriverController.endTrip);
+router.post('/trips/:tripId/delay', (0, auditLog_1.auditLog)('REPORT_DELAY', 'trips'), driverController_1.DriverController.reportDelay);
+router.patch('/trips/:tripId/passengers/:studentId', (0, auditLog_1.auditLog)('UPDATE_PASSENGER_STATUS', 'trip_passengers'), driverController_1.DriverController.updatePassengerStatus);
 exports.default = router;
 //# sourceMappingURL=driverRoutes.js.map

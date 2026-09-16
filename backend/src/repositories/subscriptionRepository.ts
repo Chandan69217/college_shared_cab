@@ -11,7 +11,7 @@ export class PlanRepository {
   public static async findAll(collegeId?: string): Promise<SubscriptionPlan[]> {
     let query = this.getClient()
       .from('subscription_plans')
-      .select('*')
+      .select('*, college:colleges(*)')
       .order('price');
 
     if (collegeId) {
@@ -26,7 +26,7 @@ export class PlanRepository {
   public static async findById(id: string): Promise<SubscriptionPlan | null> {
     const { data, error } = await this.getClient()
       .from('subscription_plans')
-      .select('*')
+      .select('*, college:colleges(*)')
       .eq('id', id)
       .maybeSingle();
 
@@ -38,7 +38,7 @@ export class PlanRepository {
     const { data, error } = await this.getClient()
       .from('subscription_plans')
       .insert([plan])
-      .select('*')
+      .select('*, college:colleges(*)')
       .single();
 
     if (error) throw new Error(`Create plan error: ${error.message}`);
@@ -50,11 +50,20 @@ export class PlanRepository {
       .from('subscription_plans')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('*')
+      .select('*, college:colleges(*)')
       .single();
 
     if (error) throw new Error(`Update plan error: ${error.message}`);
     return data as SubscriptionPlan;
+  }
+
+  public static async delete(id: string): Promise<void> {
+    const { error } = await this.getClient()
+      .from('subscription_plans')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(`Delete plan error: ${error.message}`);
   }
 }
 
@@ -68,32 +77,61 @@ export class SubscriptionRepository {
   public static async findAll(collegeId?: string): Promise<Subscription[]> {
     const query = this.getClient()
       .from('subscriptions')
-      .select('*, plan:subscription_plans(*), student:users(*)')
+      .select('*, plan:subscription_plans(*, college:colleges(*)), student:users!subscriptions_student_id_fkey(*)')
       .order('created_at', { ascending: false });
 
     const { data, error } = await query;
     if (error) throw new Error(`Fetch subscriptions error: ${error.message}`);
-    return (data || []) as Subscription[];
+    
+    const studentIds = Array.from(new Set((data || []).map((s: any) => s.student_id).filter(Boolean)));
+    let profileMap: Record<string, any> = {};
+    if (studentIds.length > 0) {
+      const { data: profiles } = await this.getClient()
+        .from('student_profiles')
+        .select('*, college:colleges(*)')
+        .in('id', studentIds);
+      if (profiles) {
+        profiles.forEach((p: any) => {
+          profileMap[p.id] = p;
+        });
+      }
+    }
+
+    return ((data || []) as any[]).map((s: any) => {
+      const studentUser = s.student;
+      const studentProfile = profileMap[s.student_id];
+      return {
+        ...s,
+        student_name: studentUser?.full_name || 'N/A',
+        student_email: studentUser?.email || 'N/A',
+        student_phone: studentUser?.phone || 'N/A',
+        student_id_number: studentProfile?.student_id_number || 'N/A',
+        college_name: studentProfile?.college?.name || s.plan?.college?.name || 'N/A',
+        plan_name: s.plan?.name || 'N/A',
+        rides_remaining: s.remaining_rides ?? s.total_rides_allocated ?? 0,
+        rides_allocated: s.total_rides_allocated ?? s.plan?.ride_count_total ?? 0,
+      };
+    }) as Subscription[];
   }
 
   public static async findActiveByStudentId(studentId: string): Promise<Subscription | null> {
     const { data, error } = await this.getClient()
       .from('subscriptions')
-      .select('*, plan:subscription_plans(*)')
+      .select('*, plan:subscription_plans(*, college:colleges(*))')
       .eq('student_id', studentId)
       .eq('status', 'ACTIVE')
       .order('end_date', { ascending: false })
-      .maybeSingle();
+      .limit(1);
 
     if (error) throw new Error(`Fetch active student subscription error: ${error.message}`);
-    return data as Subscription | null;
+    return (data && data.length > 0) ? (data[0] as Subscription) : null;
   }
 
   public static async create(subscription: Partial<Subscription>): Promise<Subscription> {
     const { data, error } = await this.getClient()
       .from('subscriptions')
       .insert([subscription])
-      .select('*, plan:subscription_plans(*)')
+      .select('*, plan:subscription_plans(*, college:colleges(*))')
       .single();
 
     if (error) throw new Error(`Create subscription error: ${error.message}`);
@@ -105,7 +143,7 @@ export class SubscriptionRepository {
       .from('subscriptions')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('*, plan:subscription_plans(*)')
+      .select('*, plan:subscription_plans(*, college:colleges(*))')
       .single();
 
     if (error) throw new Error(`Update subscription error: ${error.message}`);

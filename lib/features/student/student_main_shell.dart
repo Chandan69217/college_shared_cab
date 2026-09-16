@@ -15,6 +15,19 @@ class StudentMainShell extends StatefulWidget {
 
 class _StudentMainShellState extends State<StudentMainShell> {
   int _currentIndex = 0;
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      StudentHomeScreen(onNavigateTab: _onTabSelected),
+      BookRideScreen(onNavigateTab: _onTabSelected),
+      const DailyPassScreen(),
+      const VehicleTrackingScreen(),
+      const StudentProfileScreen(),
+    ];
+  }
 
   void _onTabSelected(int index) {
     setState(() => _currentIndex = index);
@@ -22,19 +35,11 @@ class _StudentMainShellState extends State<StudentMainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      StudentHomeScreen(onNavigateTab: _onTabSelected),
-      BookRideScreen(onNavigateTab: _onTabSelected),
-      const DailyPassScreen(),
-      const VehicleTrackingScreen(),
-      const StudentProfileScreen(),
-    ];
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _currentIndex,
-        children: screens,
+        children: _screens,
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(

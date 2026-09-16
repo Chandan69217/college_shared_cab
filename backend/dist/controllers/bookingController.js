@@ -6,11 +6,22 @@ const bookingRepository_1 = require("../repositories/bookingRepository");
 const schemas_1 = require("../validators/schemas");
 const response_1 = require("../utils/response");
 class BookingController {
+    static async checkAvailability(req, res, next) {
+        try {
+            const studentId = req.user.userId;
+            const validated = schemas_1.checkAvailabilitySchema.parse(req.body);
+            const result = await bookingService_1.BookingService.checkAvailability(studentId, validated.route_id, validated.pickup_point_id, validated.drop_point_id);
+            (0, response_1.sendSuccess)(res, result.message, result, result.available ? 200 : 200);
+        }
+        catch (err) {
+            next(err);
+        }
+    }
     static async bookRide(req, res, next) {
         try {
             const studentId = req.user.userId;
             const validated = schemas_1.createBookingSchema.parse(req.body);
-            const result = await bookingService_1.BookingService.bookRide(studentId, validated.trip_id, validated.pickup_point_id);
+            const result = await bookingService_1.BookingService.bookRide(studentId, validated.trip_id, validated.pickup_point_id, validated.drop_point_id);
             (0, response_1.sendSuccess)(res, 'Ride booked successfully.', result, 201);
         }
         catch (err) {

@@ -11,7 +11,7 @@ export class ComplaintRepository {
   public static async findAll(): Promise<Complaint[]> {
     const { data, error } = await this.getClient()
       .from('complaints')
-      .select('*, student:students(*, user:users(*))')
+      .select('*, student:users!complaints_student_id_fkey(*)')
       .order('created_at', { ascending: false });
 
     if (error) throw new Error(`Fetch complaints error: ${error.message}`);

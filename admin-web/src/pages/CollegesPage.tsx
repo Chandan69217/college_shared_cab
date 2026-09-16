@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { LocationPickerMap } from '../components/LocationPickerMap';
 import { api, getApiErrorMessage } from '../services/api';
 import { College } from '../types';
 
@@ -345,34 +346,33 @@ export const CollegesPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Latitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.latitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Longitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.longitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
+          {/* Google Maps Campus Location Picker */}
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">
+              Select Campus Location & Geofence on Google Maps
+            </label>
+            <LocationPickerMap
+              initialLat={formData.latitude}
+              initialLng={formData.longitude}
+              collegeName={formData.name || 'Campus Hub'}
+              serviceRadiusKm={formData.service_radius_km || 10.0}
+              onLocationChange={(lat, lng) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  latitude: lat,
+                  longitude: lng,
+                }));
+              }}
+              onAddressSelect={(addr, name) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  address: addr,
+                  name: prev.name ? prev.name : (name || addr.split(',')[0]),
+                }));
+              }}
+            />
           </div>
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -479,34 +479,33 @@ export const CollegesPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Latitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.latitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Longitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.longitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
+          {/* Google Maps Campus Location Picker */}
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">
+              Update Campus Location & Geofence on Google Maps
+            </label>
+            <LocationPickerMap
+              initialLat={formData.latitude}
+              initialLng={formData.longitude}
+              collegeName={formData.name || 'Campus Hub'}
+              serviceRadiusKm={formData.service_radius_km || 10.0}
+              onLocationChange={(lat, lng) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  latitude: lat,
+                  longitude: lng,
+                }));
+              }}
+              onAddressSelect={(addr, name) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  address: addr,
+                  name: prev.name ? prev.name : (name || addr.split(',')[0]),
+                }));
+              }}
+            />
           </div>
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

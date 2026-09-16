@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { LocationPickerMap } from '../components/LocationPickerMap';
 import { api, getApiErrorMessage } from '../services/api';
 import { PickupPoint, College } from '../types';
 
@@ -178,12 +179,21 @@ export const PickupPointsPage: React.FC = () => {
   const columns: Column<PickupPoint>[] = [
     {
       header: 'Pickup Name & Landmark',
-      accessor: (p) => (
-        <div>
-          <p className="font-semibold text-white">{p.name}</p>
-          <p className="text-[11px] text-slate-400">{p.landmark || 'No landmark specified'}</p>
-        </div>
-      ),
+      accessor: (p) => {
+        const college = p.college || colleges.find((c) => c.id === p.college_id);
+        return (
+          <div>
+            <p className="font-semibold text-white">{p.name}</p>
+            <p className="text-[11px] text-slate-400">{p.landmark || 'No landmark specified'}</p>
+            {college && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 mt-0.5">
+                <GraduationCap className="w-3 h-3 text-slate-400" />
+                {college.name}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Address',
@@ -193,8 +203,10 @@ export const PickupPointsPage: React.FC = () => {
     {
       header: 'Distance to College',
       accessor: (p) => {
+        const college = p.college || colleges.find((c) => c.id === p.college_id);
+        const radius = college?.service_radius_km ?? 25.0;
         const dist = p.distance_to_college_km || 0;
-        const isOutside = dist > 10.0;
+        const isOutside = dist > radius;
         return (
           <div className="flex items-center gap-1.5">
             <span className={`font-semibold ${isOutside ? 'text-rose-400' : 'text-emerald-400'}`}>
@@ -202,25 +214,18 @@ export const PickupPointsPage: React.FC = () => {
             </span>
             {isOutside ? (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                &gt;10km
+                &gt;{radius}km
               </span>
             ) : (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Inside Radius
+                Inside (≤{radius}km)
               </span>
             )}
           </div>
         );
       },
     },
-    {
-      header: 'Geocoded Coordinates',
-      accessor: (p) => (
-        <span className="font-mono text-[11px] text-slate-400">
-          {p.latitude ? p.latitude.toFixed(4) : 'N/A'}, {p.longitude ? p.longitude.toFixed(4) : 'N/A'}
-        </span>
-      ),
-    },
+
     {
       header: 'Status & Approval',
       accessor: (p) => (
@@ -417,34 +422,42 @@ export const PickupPointsPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Latitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.latitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Longitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.longitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
+          {/* Interactive Google Map Location Picker */}
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">
+              Select Stop Coordinates on Map (Google Maps)
+            </label>
+            {(() => {
+              const activeCollege = colleges.find((c) => c.id === formData.college_id) || colleges[0];
+              return (
+                <LocationPickerMap
+                  initialLat={formData.latitude}
+                  initialLng={formData.longitude}
+                  collegeLat={activeCollege?.latitude}
+                  collegeLng={activeCollege?.longitude}
+                  collegeName={activeCollege?.name}
+                  serviceRadiusKm={activeCollege?.service_radius_km || 10.0}
+                  onLocationChange={(lat, lng, dist, isWithin) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      latitude: lat,
+                      longitude: lng,
+                      is_approved: isWithin ? prev.is_approved : false,
+                    }));
+                  }}
+                  onAddressSelect={(addr, name) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      address: addr,
+                      name: prev.name ? prev.name : (name || addr.split(',')[0]),
+                    }));
+                  }}
+                />
+              );
+            })()}
           </div>
+
+
 
           <div className="flex items-center gap-2 pt-1">
             <input
@@ -539,34 +552,42 @@ export const PickupPointsPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Latitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.latitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, latitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Longitude</label>
-              <input
-                type="number"
-                step="0.0001"
-                required
-                value={formData.longitude}
-                onChange={(e) =>
-                  setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })
-                }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
+          {/* Interactive Google Map Location Picker */}
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">
+              Adjust Stop Coordinates on Map (Google Maps)
+            </label>
+            {(() => {
+              const activeCollege = colleges.find((c) => c.id === formData.college_id) || colleges[0];
+              return (
+                <LocationPickerMap
+                  initialLat={formData.latitude}
+                  initialLng={formData.longitude}
+                  collegeLat={activeCollege?.latitude}
+                  collegeLng={activeCollege?.longitude}
+                  collegeName={activeCollege?.name}
+                  serviceRadiusKm={activeCollege?.service_radius_km || 10.0}
+                  onLocationChange={(lat, lng, dist, isWithin) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      latitude: lat,
+                      longitude: lng,
+                      is_approved: isWithin ? prev.is_approved : false,
+                    }));
+                  }}
+                  onAddressSelect={(addr, name) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      address: addr,
+                      name: prev.name ? prev.name : (name || addr.split(',')[0]),
+                    }));
+                  }}
+                />
+              );
+            })()}
           </div>
+
+
 
           <div className="space-y-2 pt-1">
             <div className="flex items-center gap-2">

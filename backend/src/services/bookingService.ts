@@ -7,9 +7,249 @@ import { TripRepository } from '../repositories/tripRepository';
 import { SubscriptionRepository } from '../repositories/subscriptionRepository';
 import { PickupPointRepository } from '../repositories/pickupPointRepository';
 import { getSupabaseClient } from '../database/supabaseClient';
+import { getHaversineDistanceKm } from '../utils/geo';
 
 export class BookingService {
   private static tripLocks: Map<string, Promise<void>> = new Map();
+
+  /**
+   * Check route, stop validity and live cab availability before booking
+   */
+  public static async checkAvailability(
+    studentId: string,
+    routeId?: string,
+    pickupPointId?: string,
+    dropPointId?: string,
+    tripId?: string,
+    tripType?: string
+  ) {
+    const supabase = getSupabaseClient()!;
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    if (!pickupPointId) {
+      return {
+        available: false,
+        reason: 'MISSING_PICKUP_POINT',
+        message: 'Pickup point ID is required.',
+        trips: [],
+      };
+    }
+
+    // 1. Verify student profile verification status
+    const studentProfile = await UserRepository.getStudentProfile(studentId);
+    if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
+      return {
+        available: false,
+        reason: 'STUDENT_NOT_VERIFIED',
+        message: 'Student account is pending administrative verification. Booking is disabled.',
+        trips: [],
+      };
+    }
+
+    // 2. Verify subscription
+    const activeSub = await SubscriptionRepository.findActiveByStudentId(studentId);
+    if (!activeSub || (activeSub.remaining_rides || 0) <= 0) {
+      return {
+        available: false,
+        reason: 'NO_ACTIVE_SUBSCRIPTION',
+        message: 'No active subscription with available ride credits found. Please purchase a plan.',
+        trips: [],
+      };
+    }
+
+    let targetRouteId = routeId;
+    if (tripId && !targetRouteId) {
+      const tripObj = await TripRepository.findById(tripId);
+      if (tripObj) {
+        targetRouteId = tripObj.route_id;
+      }
+    }
+
+    if (!targetRouteId) {
+      return {
+        available: false,
+        reason: 'INVALID_ROUTE',
+        message: 'Route ID is required for checking availability.',
+        trips: [],
+      };
+    }
+
+    // 3. Verify Route exists & active
+    const { data: route, error: routeErr } = await supabase
+      .from('routes')
+      .select('*, college:colleges(*), route_pickup_points(*, pickup_point:pickup_points(*))')
+      .eq('id', targetRouteId)
+      .maybeSingle();
+
+    if (routeErr || !route || !route.is_active) {
+      return {
+        available: false,
+        reason: 'INVALID_ROUTE',
+        message: 'No active route found for the selected identifier.',
+        trips: [],
+      };
+    }
+
+    // 4. Validate Pickup Point on this Route
+    const pickupStop = (route.route_pickup_points || []).find(
+      (rpp: any) => rpp.pickup_point_id === pickupPointId
+    );
+    if (!pickupStop) {
+      return {
+        available: false,
+        reason: 'INVALID_PICKUP_FOR_ROUTE',
+        message: 'This pickup point does not belong to the selected route.',
+        trips: [],
+      };
+    }
+
+    // 5. Validate Drop Point if provided
+    let dropStop: any = null;
+    if (dropPointId) {
+      dropStop = (route.route_pickup_points || []).find(
+        (rpp: any) => rpp.pickup_point_id === dropPointId
+      );
+      if (!dropStop) {
+        return {
+          available: false,
+          reason: 'INVALID_DROP_FOR_ROUTE',
+          message: 'This drop point is not valid for the selected route.',
+          trips: [],
+        };
+      }
+      if (dropStop.sequence_order <= pickupStop.sequence_order) {
+        return {
+          available: false,
+          reason: 'INVALID_STOP_SEQUENCE',
+          message: 'Drop point must be located after the pickup point along the route sequence.',
+          trips: [],
+        };
+      }
+    }
+
+    // 6. Ensure daily trips are instantiated for today
+    await TripRepository.syncDailyTripsForDate(todayIST, targetRouteId);
+
+    // 7. Find active/scheduled trips for today on this route
+    let tripsQuery = supabase
+      .from('trips')
+      .select('*, vehicle:vehicles(*), driver:users!trips_driver_id_fkey(*)')
+      .eq('route_id', targetRouteId)
+      .eq('trip_date', todayIST)
+      .in('status', ['SCHEDULED', 'IN_PROGRESS']);
+
+    if (tripId) {
+      tripsQuery = tripsQuery.eq('id', tripId);
+    }
+    if (tripType) {
+      tripsQuery = tripsQuery.eq('trip_type', tripType);
+    }
+
+    const { data: routeTrips, error: tripsErr } = await tripsQuery;
+
+    if (tripsErr || !routeTrips || routeTrips.length === 0) {
+      return {
+        available: false,
+        reason: 'NO_CABS_ON_ROUTE',
+        message: 'No active cab is currently available for this route.',
+        trips: [],
+      };
+    }
+
+    let hasPassedAll = true;
+    let hasFullCapacity = true;
+    const eligibleTrips: any[] = [];
+
+    const pickupPointData = pickupStop.pickup_point;
+
+    for (const trip of routeTrips) {
+      const seatsLeft = (trip.max_capacity || 6) - (trip.booked_seats || 0);
+      const isFull = seatsLeft <= 0;
+      if (!isFull) hasFullCapacity = false;
+
+      const currentStopSeq = trip.current_stop_sequence || 0;
+      const hasPassed = trip.status === 'IN_PROGRESS' && currentStopSeq >= pickupStop.sequence_order;
+      if (!hasPassed) hasPassedAll = false;
+
+      // Distance & ETA calculation
+      let distanceToPickupKm: number | null = null;
+      let etaMinutes: number | null = null;
+      if (trip.live_latitude && trip.live_longitude && pickupPointData?.latitude && pickupPointData?.longitude) {
+        distanceToPickupKm = getHaversineDistanceKm(
+          trip.live_latitude,
+          trip.live_longitude,
+          pickupPointData.latitude,
+          pickupPointData.longitude
+        );
+        etaMinutes = Math.max(1, Math.round((distanceToPickupKm / 30) * 60));
+      }
+
+      const isEligible = !isFull && !hasPassed;
+
+      eligibleTrips.push({
+        id: trip.id,
+        tripType: trip.trip_type,
+        status: trip.status,
+        scheduledDepartureTime: trip.scheduled_departure_time,
+        actualStartTime: trip.actual_start_time,
+        maxCapacity: trip.max_capacity,
+        bookedSeats: trip.booked_seats,
+        availableSeats: Math.max(0, seatsLeft),
+        currentStopSequence: currentStopSeq,
+        hasPassedPickupStop: hasPassed,
+        isFull,
+        isEligible,
+        distanceToPickupKm,
+        etaMinutes,
+        vehicle: {
+          id: trip.vehicle?.id,
+          number: trip.vehicle?.vehicle_number,
+          model: trip.vehicle?.model,
+          type: trip.vehicle?.type,
+        },
+        driver: {
+          id: trip.driver?.id,
+          name: trip.driver?.full_name,
+          phone: trip.driver?.phone,
+        },
+      });
+    }
+
+    const availableTrips = eligibleTrips.filter((t) => t.isEligible);
+
+    if (availableTrips.length === 0) {
+      if (hasPassedAll) {
+        return {
+          available: false,
+          reason: 'ALL_CABS_PASSED_STOP',
+          message: 'All available cabs have already passed this pickup point. Please try another pickup point or try again later.',
+          trips: eligibleTrips,
+        };
+      }
+      if (hasFullCapacity) {
+        return {
+          available: false,
+          reason: 'ALL_CABS_FULL',
+          message: 'The selected cab is full. All cabs on this route have reached maximum capacity.',
+          trips: eligibleTrips,
+        };
+      }
+      return {
+        available: false,
+        reason: 'NO_ELIGIBLE_CAB',
+        message: 'No eligible cab is currently available for your selected pickup point.',
+        trips: eligibleTrips,
+      };
+    }
+
+    return {
+      available: true,
+      reason: 'OK',
+      message: `${availableTrips.length} cab(s) available on this route.`,
+      trips: eligibleTrips,
+      availableTrips,
+    };
+  }
 
   /**
    * Concurrency-safe atomic ride booking with Supabase
@@ -17,7 +257,8 @@ export class BookingService {
   public static async bookRide(
     studentId: string,
     tripId: string,
-    pickupPointId: string
+    pickupPointId: string,
+    dropPointId?: string
   ): Promise<{ booking: Booking; pass: DailyTravelPass; qrToken: string }> {
     while (this.tripLocks.has(tripId)) {
       await this.tripLocks.get(tripId);
@@ -41,7 +282,7 @@ export class BookingService {
         throw err;
       }
 
-      // 2. Verify Trip exists & is scheduled
+      // 2. Verify Trip exists & is in eligible status (SCHEDULED or IN_PROGRESS)
       const trip = await TripRepository.findById(tripId);
       if (!trip) {
         const err: any = new Error('Selected trip not found.');
@@ -50,24 +291,14 @@ export class BookingService {
         throw err;
       }
 
-      if (trip.status !== 'SCHEDULED') {
+      if (trip.status !== 'SCHEDULED' && trip.status !== 'IN_PROGRESS') {
         const err: any = new Error(`Trip is not open for booking (status: ${trip.status}).`);
         err.statusCode = 400;
         err.code = 'TRIP_UNAVAILABLE';
         throw err;
       }
 
-      // 3. Concurrency check: Seat Capacity
-      if ((trip.booked_seats || 0) >= trip.max_capacity) {
-        const err: any = new Error(
-          `FULLY BOOKED: All ${trip.max_capacity} seats on this trip are occupied.`
-        );
-        err.statusCode = 409;
-        err.code = 'FULLY_BOOKED';
-        throw err;
-      }
-
-      // 4. Verify Active Subscription with remaining rides
+      // 3. Verify Active Subscription with remaining rides
       const activeSub = await SubscriptionRepository.findActiveByStudentId(studentId);
       if (!activeSub || (activeSub.remaining_rides || 0) <= 0) {
         const err: any = new Error(
@@ -78,17 +309,7 @@ export class BookingService {
         throw err;
       }
 
-      // 5. Prevent Duplicate Booking for same trip
-      const existingBookings = await BookingRepository.findByStudentId(studentId);
-      const isDuplicate = existingBookings.some((b) => b.trip_id === tripId && b.status === 'CONFIRMED');
-      if (isDuplicate) {
-        const err: any = new Error('You already have a confirmed booking for this trip.');
-        err.statusCode = 409;
-        err.code = 'DUPLICATE_BOOKING';
-        throw err;
-      }
-
-      // 6. Validate Pickup Point
+      // 4. Validate Pickup Point
       const pickupPoint = await PickupPointRepository.findById(pickupPointId);
       if (!pickupPoint || !pickupPoint.is_active || !pickupPoint.is_approved) {
         const err: any = new Error('Invalid or unapproved pickup point.');
@@ -97,40 +318,63 @@ export class BookingService {
         throw err;
       }
 
-      // 7. Deduct ride credit from Subscription in Supabase
-      await SubscriptionRepository.update(activeSub.id, {
-        remaining_rides: activeSub.remaining_rides - 1,
-      });
-
-      // 8. Increment trip booked seats in Supabase
-      const seatNumber = (trip.booked_seats || 0) + 1;
-      await TripRepository.update(tripId, {
-        booked_seats: seatNumber,
-      });
-
-      // 9. Create Booking record in Supabase
+      // 5. Validate Pickup Point belongs to Trip Route
       const supabase = getSupabaseClient()!;
-      const { data: createdBooking, error: bkErr } = await supabase
-        .from('bookings')
-        .insert([{
-          student_id: studentId,
-          subscription_id: activeSub.id,
-          trip_id: tripId,
-          route_id: trip.route_id,
-          pickup_point_id: pickupPointId,
-          booking_date: trip.trip_date,
-          trip_type: trip.trip_type,
-          seat_number: seatNumber,
-          status: 'CONFIRMED',
-        }])
-        .select('*')
-        .single();
+      const { data: pickupStop } = await supabase
+        .from('route_pickup_points')
+        .select('sequence_order')
+        .eq('route_id', trip.route_id)
+        .eq('pickup_point_id', pickupPointId)
+        .maybeSingle();
 
-      if (bkErr) throw new Error(`Booking creation error: ${bkErr.message}`);
+      if (!pickupStop) {
+        const err: any = new Error('This pickup point does not belong to the selected route.');
+        err.statusCode = 400;
+        err.code = 'INVALID_PICKUP_FOR_ROUTE';
+        throw err;
+      }
 
-      // 10. Generate Dynamic HMAC QR token and Travel Pass in Supabase
+      // 6. Validate Drop Point if provided
+      let dropPoint: any = null;
+      if (dropPointId) {
+        dropPoint = await PickupPointRepository.findById(dropPointId);
+        const { data: dropStop } = await supabase
+          .from('route_pickup_points')
+          .select('sequence_order')
+          .eq('route_id', trip.route_id)
+          .eq('pickup_point_id', dropPointId)
+          .maybeSingle();
+
+        if (!dropStop) {
+          const err: any = new Error('This drop point is not valid for the selected route.');
+          err.statusCode = 400;
+          err.code = 'INVALID_DROP_FOR_ROUTE';
+          throw err;
+        }
+
+        if (dropStop.sequence_order <= pickupStop.sequence_order) {
+          const err: any = new Error('Drop point must be located after the pickup point along the route sequence.');
+          err.statusCode = 400;
+          err.code = 'INVALID_STOP_SEQUENCE';
+          throw err;
+        }
+      }
+
+      // 7. Stop progression check for active trip
+      if (trip.status === 'IN_PROGRESS') {
+        const currentStopSeq = trip.current_stop_sequence || 0;
+        if (pickupStop.sequence_order <= currentStopSeq) {
+          const err: any = new Error('All available cabs have already passed this pickup point. Please try another pickup point or try again later.');
+          err.statusCode = 400;
+          err.code = 'STOP_ALREADY_PASSED';
+          throw err;
+        }
+      }
+
+      // 8. Generate Dynamic HMAC QR token
+      const tempPassId = `pass_${Date.now()}`;
       const { token: qrToken, expiresAt } = generateDynamicQrToken(
-        createdBooking.id,
+        tempPassId,
         studentId,
         tripId,
         trip.route_id,
@@ -138,47 +382,89 @@ export class BookingService {
         180
       );
 
-      const { data: createdPass, error: psErr } = await supabase
+      // 9. Execute atomic PostgreSQL booking procedure
+      let atomicResult: any;
+      try {
+        atomicResult = await BookingRepository.bookTripAtomic(
+          studentId,
+          activeSub.id,
+          tripId,
+          pickupPointId,
+          qrToken,
+          new Date(expiresAt),
+          dropPointId
+        );
+      } catch (dbErr: any) {
+        const msg = dbErr.message || '';
+        const err: any = new Error(msg);
+        if (msg.includes('FULLY_BOOKED')) {
+          err.message = `Sorry, this trip is now fully booked (${trip.max_capacity} seats occupied).`;
+          err.statusCode = 409;
+          err.code = 'FULLY_BOOKED';
+        } else if (msg.includes('DUPLICATE_BOOKING')) {
+          err.message = 'You already have a confirmed booking for this trip.';
+          err.statusCode = 409;
+          err.code = 'DUPLICATE_BOOKING';
+        } else if (msg.includes('STOP_ALREADY_PASSED')) {
+          err.message = 'All available cabs have already passed this pickup point. Please try another pickup point or try again later.';
+          err.statusCode = 400;
+          err.code = 'STOP_ALREADY_PASSED';
+        } else if (msg.includes('NO_RIDES_REMAINING') || msg.includes('SUBSCRIPTION_EXPIRED')) {
+          err.statusCode = 402;
+          err.code = 'SUBSCRIPTION_ERROR';
+        } else {
+          err.statusCode = 400;
+        }
+        throw err;
+      }
+
+      const bookingId = atomicResult.booking_id;
+      const passId = atomicResult.pass_id;
+      const seatNumber = atomicResult.seat_number;
+
+      // 10. Generate and store the definitive dynamic HMAC QR token with the actual pass ID
+      const { token: realQrToken, expiresAt: realExpiresAt } = generateDynamicQrToken(
+        passId,
+        studentId,
+        tripId,
+        trip.route_id,
+        trip.trip_date,
+        180
+      );
+
+      await supabase
         .from('daily_travel_passes')
-        .insert([{
-          student_id: studentId,
-          booking_id: createdBooking.id,
-          trip_id: tripId,
-          pass_date: trip.trip_date,
-          trip_type: trip.trip_type,
-          route_id: trip.route_id,
-          pickup_point_id: pickupPointId,
-          auth_token_hash: qrToken,
-          valid_until: expiresAt,
-          status: 'ACTIVE',
-        }])
+        .update({
+          qr_code_data: realQrToken,
+          qr_expires_at: new Date(realExpiresAt).toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', passId);
+
+      const { data: createdBooking } = await supabase
+        .from('bookings')
         .select('*')
+        .eq('id', bookingId)
         .single();
 
-      if (psErr) throw new Error(`Pass generation error: ${psErr.message}`);
-
-      // 11. Add to Passenger Manifest in Supabase
-      await supabase.from('trip_passengers').insert([{
-        trip_id: tripId,
-        booking_id: createdBooking.id,
-        student_id: studentId,
-        pickup_point_id: pickupPointId,
-        seat_number: seatNumber,
-        status: 'WAITING',
-      }]);
+      const { data: createdPass } = await supabase
+        .from('daily_travel_passes')
+        .select('*')
+        .eq('id', passId)
+        .single();
 
       await NotificationProvider.send(
         studentId,
         'Ride Booked Successfully!',
         `Seat #${seatNumber} confirmed on scheduled trip. Your daily pass is ready.`,
         'BOOKING',
-        { bookingId: createdBooking.id, passId: createdPass.id, tripId }
+        { bookingId, passId, tripId }
       );
 
       return {
-        booking: { ...createdBooking, trip, pickup_point: pickupPoint } as Booking,
-        pass: { ...createdPass, trip, pickup_point: pickupPoint } as DailyTravelPass,
-        qrToken,
+        booking: { ...(createdBooking || {}), seat_number: seatNumber, trip, pickup_point: pickupPoint, drop_point: dropPoint } as Booking,
+        pass: { ...(createdPass || {}), qr_code_data: realQrToken, trip, pickup_point: pickupPoint, drop_point: dropPoint } as DailyTravelPass,
+        qrToken: realQrToken,
       };
     } finally {
       this.tripLocks.delete(tripId);

@@ -48,13 +48,19 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
       });
 
       if (initRes.data['success'] == true) {
-        final paymentId = initRes.data['data']['paymentId'];
+        final paymentData = initRes.data['data'] ?? {};
+        final paymentId = paymentData['paymentId'];
+        final gatewayOrderId = paymentData['gatewayOrderId'];
 
-        // 2. Simulated secure payment confirmation
+        // 2. Secure payment confirmation
         final confirmRes = await apiClient.post('/payments/confirm', data: {
           'paymentId': paymentId,
+          'payment_id': paymentId,
+          'gatewayOrderId': gatewayOrderId,
+          'gateway_order_id': gatewayOrderId,
           'gatewayPaymentId': 'pay_tx_${DateTime.now().millisecondsSinceEpoch}',
           'signature': 'sig_verified_gateway',
+          'gatewaySignature': 'sig_verified_gateway',
         });
 
         if (confirmRes.data['success'] == true && mounted) {

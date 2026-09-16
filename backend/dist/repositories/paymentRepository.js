@@ -12,7 +12,7 @@ class PaymentRepository {
     static async findAll() {
         const { data, error } = await this.getClient()
             .from('payments')
-            .select('*, student:students(*, user:users(*)), plan:subscription_plans(*)')
+            .select('*, student:users!payments_student_id_fkey(*), subscription:subscriptions!payments_subscription_id_fkey(*, plan:subscription_plans(*))')
             .order('created_at', { ascending: false });
         if (error)
             throw new Error(`Fetch payments error: ${error.message}`);
@@ -21,7 +21,7 @@ class PaymentRepository {
     static async findByStudentId(studentId) {
         const { data, error } = await this.getClient()
             .from('payments')
-            .select('*, plan:subscription_plans(*)')
+            .select('*, subscription:subscriptions!payments_subscription_id_fkey(*, plan:subscription_plans(*))')
             .eq('student_id', studentId)
             .order('created_at', { ascending: false });
         if (error)

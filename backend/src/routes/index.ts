@@ -16,6 +16,10 @@ import profileRoutes from './profileRoutes';
 
 const router = Router();
 
+import { authenticateJwt } from '../middleware/auth';
+import { requireRole } from '../middleware/rbac';
+import { AdminController } from '../controllers/adminController';
+
 router.use('/auth', authRoutes);
 router.use('/profile', profileRoutes);
 router.use('/students', studentRoutes);
@@ -30,5 +34,8 @@ router.use('/payments', paymentRoutes);
 router.use('/complaints', complaintRoutes);
 router.use('/reports', reportRoutes);
 router.use('/holidays', holidayRoutes);
+
+// Root alias for admin subscriptions
+router.get('/subscriptions', authenticateJwt, requireRole(['ADMIN']), AdminController.getSubscriptions);
 
 export default router;

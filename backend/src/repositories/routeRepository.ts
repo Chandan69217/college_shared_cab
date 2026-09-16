@@ -11,7 +11,7 @@ export class RouteRepository {
   public static async findAll(collegeId?: string): Promise<Route[]> {
     let query = this.getClient()
       .from('routes')
-      .select('*, default_vehicle:vehicles(*), default_driver:users!routes_default_driver_id_fkey(*), route_pickup_points(*, pickup_point:pickup_points(*))')
+      .select('*, college:colleges(*), default_vehicle:vehicles(*), default_driver:users!routes_default_driver_id_fkey(*), route_pickup_points(*, pickup_point:pickup_points(*))')
       .order('name');
 
     if (collegeId) {
@@ -30,7 +30,7 @@ export class RouteRepository {
   public static async findById(id: string): Promise<Route | null> {
     const { data, error } = await this.getClient()
       .from('routes')
-      .select('*, default_vehicle:vehicles(*), default_driver:users!routes_default_driver_id_fkey(*), route_pickup_points(*, pickup_point:pickup_points(*))')
+      .select('*, college:colleges(*), default_vehicle:vehicles(*), default_driver:users!routes_default_driver_id_fkey(*), route_pickup_points(*, pickup_point:pickup_points(*))')
       .eq('id', id)
       .maybeSingle();
 

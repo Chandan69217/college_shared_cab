@@ -20,11 +20,12 @@ class PaymentController {
     static async confirmPayment(req, res, next) {
         try {
             const studentId = req.user.userId;
-            const { gatewayOrderId, gatewayPaymentId, gatewaySignature } = req.body;
+            const { paymentId, payment_id, gatewayOrderId, gateway_order_id, gatewayPaymentId, gateway_payment_id, gatewaySignature, signature, } = req.body;
             const result = await paymentService_1.PaymentService.verifyAndCompletePayment(studentId, {
-                gateway_order_id: gatewayOrderId,
-                gateway_payment_id: gatewayPaymentId || 'pay_confirmed',
-                gateway_signature: gatewaySignature || 'sig_valid',
+                payment_id: paymentId || payment_id,
+                gateway_order_id: gatewayOrderId || gateway_order_id,
+                gateway_payment_id: gatewayPaymentId || gateway_payment_id || 'pay_confirmed',
+                gateway_signature: gatewaySignature || signature || 'sig_valid',
             });
             (0, response_1.sendSuccess)(res, 'Payment verified and subscription activated.', result);
         }

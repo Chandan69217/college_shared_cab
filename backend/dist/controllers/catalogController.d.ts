@@ -10,7 +10,8 @@ export declare class CatalogController {
     static updatePickupPoint(req: Request, res: Response, next: NextFunction): Promise<void>;
     static deletePickupPoint(req: Request, res: Response, next: NextFunction): Promise<void>;
     static getRoutes(req: Request, res: Response, next: NextFunction): Promise<void>;
-    static createRoute(req: Request, res: Response, next: NextFunction): Promise<void>;
+    static getRouteMap(req: Request, res: Response, next: NextFunction): Promise<Response<any, Record<string, any>> | undefined>;
+    static createRoute(req: Request, res: Response, next: NextFunction): Promise<Response<any, Record<string, any>> | undefined>;
     static getVehicles(req: Request, res: Response, next: NextFunction): Promise<void>;
-    static createVehicle(req: Request, res: Response, next: NextFunction): Promise<void>;
+    static createVehicle(req: Request, res: Response, next: NextFunction): Promise<Response<any, Record<string, any>> | undefined>;
 }

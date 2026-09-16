@@ -53,6 +53,7 @@ export interface College {
 export interface PickupPoint {
   id: string;
   college_id: string;
+  college?: College;
   name: string;
   landmark?: string;
   address: string;
@@ -66,6 +67,7 @@ export interface PickupPoint {
 export interface Route {
   id: string;
   college_id: string;
+  college?: College;
   name: string;
   code: string;
   description?: string;
@@ -84,6 +86,7 @@ export interface Route {
 export interface Vehicle {
   id: string;
   college_id: string;
+  college?: College;
   vehicle_number: string;
   model: string;
   type: 'CAB_4' | 'CAB_6' | 'SHUTTLE_12' | 'BUS_24';
@@ -99,6 +102,7 @@ export interface Vehicle {
 export interface SubscriptionPlan {
   id: string;
   college_id: string;
+  college?: College;
   tier: 'BASIC' | 'STANDARD' | 'PREMIUM';
   name: string;
   description?: string;
@@ -121,8 +125,8 @@ export interface Trip {
   route?: Route;
   vehicle_id: string;
   vehicle?: Vehicle;
-  driver_id: string;
-  driver?: User;
+  driver_id?: string | null;
+  driver?: User | null;
   trip_date: string;
   trip_type: 'MORNING_PICKUP' | 'EVENING_DROP';
   scheduled_departure_time: string;

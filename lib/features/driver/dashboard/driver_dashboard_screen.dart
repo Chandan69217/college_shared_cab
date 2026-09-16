@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/services/gps_tracking_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../trips/driver_scheduled_trips_screen.dart';
+import '../trips/driver_trip_detail_sheet.dart';
 
 class DriverDashboardScreen extends ConsumerStatefulWidget {
   final Function(int)? onNavigateTab;
@@ -12,19 +15,36 @@ class DriverDashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DriverDashboardScreen> createState() => _DriverDashboardScreenState();
 }
 
-class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
+class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   Map<String, dynamic>? _dashboardData;
   bool _isLoading = true;
   bool _isActionLoading = false;
+  final GpsTrackingService _gpsService = GpsTrackingService();
 
-  Future<void> _fetchDashboard() async {
+  Future<void> _fetchDashboard({bool isInitial = false}) async {
+    if (isInitial && _dashboardData == null) {
+      if (mounted) setState(() => _isLoading = true);
+    }
     try {
       final res = await apiClient.get('/drivers/dashboard');
       if (res.data['success'] == true && mounted) {
+        final data = res.data['data'];
         setState(() {
-          _dashboardData = res.data['data'];
+          _dashboardData = data;
           _isLoading = false;
         });
+
+        // Resume background tracking if active trip is in progress
+        final activeTrip = data?['activeTrip'];
+        if (activeTrip != null &&
+            activeTrip['status'] == 'IN_PROGRESS' &&
+            !_gpsService.currentStatus.isTracking) {
+          _gpsService.startTracking(activeTrip['id']);
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -34,18 +54,43 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchDashboard();
+    _fetchDashboard(isInitial: true);
   }
 
   Future<void> _handleStartTrip(String tripId) async {
     setState(() => _isActionLoading = true);
+
+    // 1. Request GPS Permission first
+    final permState = await _gpsService.checkAndRequestPermission();
+    if (permState != LocationPermissionState.granted) {
+      if (mounted) {
+        setState(() => _isActionLoading = false);
+        _showPermissionDialog(permState);
+      }
+      return;
+    }
+
     try {
-      final res = await apiClient.post('/drivers/trips/$tripId/start');
-      if (res.data['success'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip Started! Live GPS location sharing is active.')),
-        );
-        _fetchDashboard();
+      final res = await apiClient.post('/trips/$tripId/start');
+      if (res.data['success'] == true) {
+        // 2. Start Live GPS Tracking Stream
+        await _gpsService.startTracking(tripId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.gps_fixed_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Trip Started! Live GPS location sharing is active.')),
+                ],
+              ),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+          _fetchDashboard();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -64,12 +109,26 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
   Future<void> _handleEndTrip(String tripId) async {
     setState(() => _isActionLoading = true);
     try {
-      final res = await apiClient.post('/drivers/trips/$tripId/end');
-      if (res.data['success'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip Completed! Passenger manifest finalized.')),
-        );
-        _fetchDashboard();
+      final res = await apiClient.post('/trips/$tripId/end');
+      if (res.data['success'] == true) {
+        // Stop GPS Tracking
+        await _gpsService.stopTracking();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Trip Completed! GPS tracking stopped.')),
+                ],
+              ),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+          _fetchDashboard();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -85,8 +144,52 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
     }
   }
 
+  void _showPermissionDialog(LocationPermissionState state) {
+    String title = 'Location Permission Required';
+    String message = 'Please grant device location access to transmit your real vehicle coordinates during the active trip.';
+
+    if (state == LocationPermissionState.serviceDisabled) {
+      title = 'Device GPS Disabled';
+      message = 'Please turn on GPS / Location Services in your phone quick settings.';
+    } else if (state == LocationPermissionState.permanentlyDenied) {
+      title = 'Permission Permanently Denied';
+      message = 'Location access is permanently blocked. Please open App Settings and allow location permissions.';
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_off_rounded, color: AppColors.accentRose, size: 24),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _gpsService.checkAndRequestPermission();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final driver = ref.watch(authProvider).user;
     final activeTrip = _dashboardData?['activeTrip'];
     final tripStatus = activeTrip?['status'] ?? 'SCHEDULED';
@@ -272,26 +375,75 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
 
                           // Start / End Trip Controls
                           if (activeTrip != null) ...[
-                            if (tripStatus == 'SCHEDULED')
-                              ElevatedButton.icon(
-                                onPressed: _isActionLoading ? null : () => _handleStartTrip(activeTrip['id']),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  minimumSize: const Size.fromHeight(44),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => DriverTripDetailSheet.show(
+                                      context,
+                                      activeTrip['id'],
+                                      onTripUpdated: () => _fetchDashboard(),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Color(0xFF4B5563)),
+                                      padding: const EdgeInsets.symmetric(vertical: 11),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    icon: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
+                                    label: const Text('View Details', style: TextStyle(color: Colors.white, fontSize: 12)),
+                                  ),
                                 ),
-                                icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                                label: const Text('Start Trip'),
-                              )
-                            else if (tripStatus == 'IN_PROGRESS')
-                              ElevatedButton.icon(
-                                onPressed: _isActionLoading ? null : () => _handleEndTrip(activeTrip['id']),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.accentRose,
-                                  minimumSize: const Size.fromHeight(44),
-                                ),
-                                icon: const Icon(Icons.stop_rounded, size: 20),
-                                label: const Text('Complete & End Trip'),
+                                const SizedBox(width: 10),
+                                if (tripStatus == 'SCHEDULED')
+                                  Expanded(
+                                    flex: 2,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _isActionLoading ? null : () => _handleStartTrip(activeTrip['id']),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      icon: _isActionLoading
+                                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                                          : const Icon(Icons.play_arrow_rounded, size: 20),
+                                      label: const Text('Start Trip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ),
+                                  )
+                                else if (tripStatus == 'IN_PROGRESS')
+                                  Expanded(
+                                    flex: 2,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _isActionLoading ? null : () => _handleEndTrip(activeTrip['id']),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.accentRose,
+                                        padding: const EdgeInsets.symmetric(vertical: 11),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      icon: _isActionLoading
+                                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                          : const Icon(Icons.stop_rounded, size: 20),
+                                      label: const Text('Complete Trip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ] else ...[
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const DriverScheduledTripsScreen()),
+                                ).then((_) => _fetchDashboard());
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.primary),
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
+                              icon: const Icon(Icons.calendar_month_rounded, color: AppColors.primaryLight, size: 18),
+                              label: const Text('Browse All Scheduled Trips', style: TextStyle(color: AppColors.primaryLight, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
                           ],
                         ],
                       ),
@@ -309,10 +461,25 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                       children: [
                         Expanded(
                           child: _buildDriverActionCard(
+                            icon: Icons.calendar_month_rounded,
+                            title: 'Scheduled Trips',
+                            subtitle: 'Today & upcoming runs',
+                            color: AppColors.primary,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const DriverScheduledTripsScreen()),
+                              ).then((_) => _fetchDashboard());
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDriverActionCard(
                             icon: Icons.qr_code_scanner_rounded,
                             title: 'Scan QR Code',
                             subtitle: 'Board student',
-                            color: AppColors.primary,
+                            color: AppColors.accentBlue,
                             onTap: () {
                               if (widget.onNavigateTab != null) {
                                 widget.onNavigateTab!(3); // Scanner tab
@@ -320,7 +487,11 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 12),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
                         Expanded(
                           child: _buildDriverActionCard(
                             icon: Icons.people_alt_outlined,
@@ -334,16 +505,12 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                             },
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
+                        const SizedBox(width: 12),
                         Expanded(
                           child: _buildDriverActionCard(
                             icon: Icons.route_rounded,
                             title: 'Route & Stops',
-                            subtitle: 'Stop timings',
+                            subtitle: 'Stop timings & map',
                             color: AppColors.accentPurple,
                             onTap: () {
                               if (widget.onNavigateTab != null) {
@@ -352,7 +519,11 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                             },
                           ),
                         ),
-                        const SizedBox(width: 12),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
                         Expanded(
                           child: _buildDriverActionCard(
                             icon: Icons.report_problem_outlined,
@@ -360,9 +531,17 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
                             subtitle: 'Traffic / breakdown',
                             color: AppColors.accentAmber,
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Delay notification dispatched to passengers.')),
-                              );
+                              final activeTrip = _dashboardData?['activeTrip'];
+                              if (activeTrip == null || activeTrip['id'] == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('No active or scheduled trip to report delay for.'),
+                                    backgroundColor: AppColors.accentAmber,
+                                  ),
+                                );
+                                return;
+                              }
+                              _showReportDelayDialog(activeTrip['id']);
                             },
                           ),
                         ),
@@ -374,6 +553,130 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen> {
             ),
     );
   }
+
+  void _showReportDelayDialog(String tripId) {
+    int delayMinutes = 15;
+    String reason = 'TRAFFIC';
+    final notesController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.surfaceCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.report_problem_rounded, color: AppColors.accentAmber, size: 24),
+              SizedBox(width: 8),
+              Text('Report Trip Delay', style: TextStyle(color: Colors.white, fontSize: 16)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Reason for Delay', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: reason,
+                  dropdownColor: AppColors.surface,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(value: 'TRAFFIC', child: Text('Heavy Traffic / Congestion')),
+                    DropdownMenuItem(value: 'BREAKDOWN', child: Text('Vehicle Breakdown / Puncture')),
+                    DropdownMenuItem(value: 'WEATHER', child: Text('Adverse Weather Conditions')),
+                    DropdownMenuItem(value: 'ROUTE_DIVERSION', child: Text('Road Closure / Diversion')),
+                    DropdownMenuItem(value: 'OTHER', child: Text('Other Operational Delay')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => reason = val);
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Estimated Delay (Minutes)', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<int>(
+                  value: delayMinutes,
+                  dropdownColor: AppColors.surface,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(value: 5, child: Text('+5 Minutes')),
+                    DropdownMenuItem(value: 10, child: Text('+10 Minutes')),
+                    DropdownMenuItem(value: 15, child: Text('+15 Minutes')),
+                    DropdownMenuItem(value: 20, child: Text('+20 Minutes')),
+                    DropdownMenuItem(value: 30, child: Text('+30 Minutes')),
+                    DropdownMenuItem(value: 45, child: Text('+45 Minutes')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => delayMinutes = val);
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Additional Notes (Optional)', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: notesController,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: const InputDecoration(
+                    hintText: 'e.g. Stuck at main highway junction',
+                    hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      try {
+                        final res = await apiClient.post('/drivers/trips/$tripId/delay', data: {
+                          'delayMinutes': delayMinutes,
+                          'reason': reason,
+                          'notes': notesController.text.trim(),
+                        });
+                        if (res.data['success'] == true && mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Delay of +$delayMinutes mins reported. Passengers notified.'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                          _fetchDashboard();
+                        }
+                      } catch (e) {
+                        setDialogState(() => isSubmitting = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(ApiClient.getErrorMessage(e)),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentAmber),
+              child: isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                  : const Text('Broadcast Delay', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildDriverActionCard({
     required IconData icon,

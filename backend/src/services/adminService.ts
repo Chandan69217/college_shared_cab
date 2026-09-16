@@ -5,6 +5,7 @@ import { UserRepository } from '../repositories/userRepository';
 import { ReportRepository } from '../repositories/reportRepository';
 import { VehicleRepository } from '../repositories/vehicleRepository';
 import { RouteRepository } from '../repositories/routeRepository';
+import { TripRepository } from '../repositories/tripRepository';
 import { CollegeRepository } from '../repositories/collegeRepository';
 import { getSupabaseClient } from '../database/supabaseClient';
 
@@ -358,7 +359,10 @@ export class AdminService {
     },
     stops?: any[]
   ) {
-    return RouteRepository.update(routeId, updates, stops);
+    const updated = await RouteRepository.update(routeId, updates, stops);
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    await TripRepository.syncDailyTripsForDate(todayIST, routeId);
+    return updated;
   }
 
   /**
@@ -496,10 +500,18 @@ export class AdminService {
       }
     }
 
+    const finalVehicleId = data.default_vehicle_id !== undefined ? data.default_vehicle_id : route.default_vehicle_id;
+    const finalDriverId = data.default_driver_id !== undefined ? data.default_driver_id : route.default_driver_id;
+
     const updated = await RouteRepository.update(routeId, {
-      default_vehicle_id: data.default_vehicle_id !== undefined ? data.default_vehicle_id : route.default_vehicle_id,
-      default_driver_id: data.default_driver_id !== undefined ? data.default_driver_id : route.default_driver_id,
+      default_vehicle_id: finalVehicleId,
+      default_driver_id: finalDriverId,
+      is_active: true,
     });
+
+    // Synchronize scheduled trips for today & future
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    await TripRepository.syncDailyTripsForDate(todayIST, routeId);
 
     return updated;
   }
