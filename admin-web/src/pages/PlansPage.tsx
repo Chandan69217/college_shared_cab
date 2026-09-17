@@ -24,10 +24,13 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { SubscriptionPlan, College } from '../types';
 
 export const PlansPage: React.FC = () => {
+  const toast = useToast();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,11 +165,12 @@ export const PlansPage: React.FC = () => {
 
       const res = await api.post('/plans', payload);
       if (res.data.success) {
-        showSuccess(`Subscription plan "${formData.name}" created successfully.`);
+        toast.success(`Subscription plan "${formData.name}" created successfully.`);
         setIsAddModalOpen(false);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -193,12 +197,13 @@ export const PlansPage: React.FC = () => {
 
       const res = await api.patch(`/plans/${selectedPlan.id}`, payload);
       if (res.data.success) {
-        showSuccess(`Plan "${formData.name}" updated successfully.`);
+        toast.success(`Plan "${formData.name}" updated successfully.`);
         setIsEditModalOpen(false);
         setSelectedPlan(null);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -210,10 +215,10 @@ export const PlansPage: React.FC = () => {
     try {
       const nextStatus = plan.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
       await api.patch(`/plans/${plan.id}`, { status: nextStatus });
-      showSuccess(`Plan "${plan.name}" status changed to ${nextStatus}.`);
+      toast.success(`Plan "${plan.name}" status changed to ${nextStatus}.`);
       fetchData();
     } catch (err) {
-      setErrorMessage(getApiErrorMessage(err));
+      toast.error(err);
     }
   };
 
@@ -224,11 +229,12 @@ export const PlansPage: React.FC = () => {
       setActionLoading(true);
       setModalError(null);
       await api.delete(`/plans/${selectedPlan.id}`);
-      showSuccess(`Plan "${selectedPlan.name}" removed successfully.`);
+      toast.success(`Plan "${selectedPlan.name}" removed successfully.`);
       setIsDeleteModalOpen(false);
       setSelectedPlan(null);
       fetchData();
     } catch (err: any) {
+      toast.error(err);
       const msg = getApiErrorMessage(err);
       setModalError(msg);
     } finally {
@@ -1210,70 +1216,17 @@ export const PlansPage: React.FC = () => {
       </Modal>
 
       {/* DELETE CONFIRMATION MODAL */}
-      <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Delete Subscription Plan">
-        {selectedPlan && (
-          <div className="space-y-4 text-xs">
-            {modalError && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs">
-                <p className="font-semibold">{modalError}</p>
-                {modalError.includes('violates foreign key') || modalError.includes('reference') || modalError.includes('Conflict') ? (
-                  <div className="mt-2 pt-2 border-t border-rose-500/20 flex items-center justify-between">
-                    <span className="text-[11px] text-slate-400">Past student subscriptions exist.</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsDeleteModalOpen(false);
-                        handleToggleStatus(selectedPlan);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-[11px] hover:bg-amber-500/30"
-                    >
-                      Deactivate Instead
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-slate-300">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Plan Name:</span>
-                <span className="font-bold text-white">{selectedPlan.name}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Tier:</span>
-                <span className="font-mono text-emerald-400">{selectedPlan.tier}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Price:</span>
-                <span className="font-bold text-white">₹{selectedPlan.price}</span>
-              </div>
-            </div>
-
-            <p className="text-slate-400">
-              Are you sure you want to permanently delete this plan? If students have previously purchased subscriptions under this plan, it cannot be deleted and should be marked <strong>INACTIVE</strong> instead.
-            </p>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="w-1/2 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={actionLoading}
-                onClick={handleDeletePlan}
-                className="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-lg shadow-rose-600/20 transition flex items-center justify-center gap-2"
-              >
-                {actionLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                <span>{actionLoading ? 'Deleting...' : 'Confirm Delete'}</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <ConfirmDialog
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeletePlan}
+        title="Remove Commuter Plan"
+        message={`Are you sure you want to permanently delete plan "${selectedPlan?.name}" (₹${selectedPlan?.price})? If students have active or past subscriptions linked to this plan, it cannot be deleted and should be deactivated instead.`}
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+      />
     </div>
   );
 };

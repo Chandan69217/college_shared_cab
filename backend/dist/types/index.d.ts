@@ -1,4 +1,4 @@
-import { USER_ROLES, USER_STATUSES, VERIFICATION_STATUSES, DRIVER_STATUSES, VEHICLE_TYPES, VEHICLE_STATUSES, PLAN_TIERS, SUBSCRIPTION_STATUSES, TRIP_TYPES, TRIP_STATUSES, BOOKING_STATUSES, PASSENGER_STATUSES, PASS_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES, NOTIFICATION_TYPES } from '../config/constants';
+import { USER_ROLES, USER_STATUSES, VERIFICATION_STATUSES, DRIVER_STATUSES, VEHICLE_TYPES, VEHICLE_STATUSES, PLAN_TIERS, SUBSCRIPTION_STATUSES, TRIP_TYPES, TRIP_STATUSES, BOOKING_STATUSES, PASSENGER_STATUSES, PASS_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, COMPLAINT_CATEGORIES, COMPLAINT_PRIORITIES, COMPLAINT_STATUSES, NOTIFICATION_TYPES, NOTIFICATION_PRIORITIES } from '../config/constants';
 export type UserRole = keyof typeof USER_ROLES;
 export type UserStatus = keyof typeof USER_STATUSES;
 export type VerificationStatus = keyof typeof VERIFICATION_STATUSES;
@@ -18,12 +18,14 @@ export type ComplaintCategory = keyof typeof COMPLAINT_CATEGORIES;
 export type ComplaintPriority = keyof typeof COMPLAINT_PRIORITIES;
 export type ComplaintStatus = keyof typeof COMPLAINT_STATUSES;
 export type NotificationType = keyof typeof NOTIFICATION_TYPES;
+export type NotificationPriority = keyof typeof NOTIFICATION_PRIORITIES;
 export interface ApiResponse<T = any> {
     success: boolean;
     message: string;
     data?: T | null;
     error?: {
         code: string;
+        message?: string;
         details?: any;
     } | null;
 }
@@ -343,12 +345,29 @@ export interface Rating {
 export interface Notification {
     id: string;
     user_id: string;
+    recipient_role?: UserRole;
     title: string;
     message: string;
     type: NotificationType;
+    entity_type?: string;
+    entity_id?: string;
+    priority?: NotificationPriority;
     is_read: boolean;
+    read_at?: string | null;
     data?: Record<string, any>;
     created_at: string;
+}
+export interface UserDevice {
+    id: string;
+    user_id: string;
+    device_token: string;
+    platform: 'android' | 'ios' | 'web';
+    device_name?: string;
+    app_version?: string;
+    is_active: boolean;
+    last_seen_at: string;
+    created_at: string;
+    updated_at: string;
 }
 export interface CollegeHoliday {
     id: string;

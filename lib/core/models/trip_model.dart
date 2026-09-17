@@ -54,37 +54,65 @@ class TripModel {
   });
 
   factory TripModel.fromJson(Map<String, dynamic> json) {
-    final booked = json['booked_seats'] ?? json['bookedSeats'] ?? json['passenger_count'] ?? json['passengerCount'] ?? 0;
-    final boarded = json['boarded_passengers'] ?? json['boardedPassengers'] ?? 0;
-    final notBoarded = json['not_boarded_passengers'] ?? json['notBoardedPassengers'] ?? (booked - boarded).clamp(0, booked);
-    final cancelled = json['cancelled_passengers'] ?? json['cancelledPassengers'] ?? 0;
-    final currentSeq = json['current_stop_sequence'] ?? json['currentStopSequence'] ?? 0;
+    final booked = (json['booked_seats'] as num?)?.toInt() ??
+        (json['bookedSeats'] as num?)?.toInt() ??
+        (json['passenger_count'] as num?)?.toInt() ??
+        (json['passengerCount'] as num?)?.toInt() ??
+        0;
+    final boarded = (json['boarded_passengers'] as num?)?.toInt() ??
+        (json['boardedPassengers'] as num?)?.toInt() ??
+        0;
+    final notBoarded = (json['not_boarded_passengers'] as num?)?.toInt() ??
+        (json['notBoardedPassengers'] as num?)?.toInt() ??
+        (booked - boarded).clamp(0, booked);
+    final cancelled = (json['cancelled_passengers'] as num?)?.toInt() ??
+        (json['cancelledPassengers'] as num?)?.toInt() ??
+        0;
+    final currentSeq = (json['current_stop_sequence'] as num?)?.toInt() ??
+        (json['currentStopSequence'] as num?)?.toInt() ??
+        0;
 
     return TripModel(
-      id: json['id'] ?? '',
-      routeId: json['route_id'] ?? json['routeId'] ?? '',
-      route: json['route'] != null ? RouteModel.fromJson(json['route']) : null,
-      vehicleId: json['vehicle_id'] ?? json['vehicleId'] ?? '',
-      vehicle: json['vehicle'],
-      driverId: json['driver_id'] ?? json['driverId'] ?? '',
-      driver: json['driver'],
-      tripDate: json['trip_date'] ?? json['tripDate'] ?? '',
-      tripType: json['trip_type'] ?? json['tripType'] ?? 'MORNING_PICKUP',
-      scheduledDepartureTime: json['scheduled_departure_time'] ?? json['scheduledDepartureTime'] ?? '',
-      actualStartTime: json['actual_start_time'] ?? json['actualStartTime'],
-      actualEndTime: json['actual_end_time'] ?? json['actualEndTime'],
-      status: json['status'] ?? 'SCHEDULED',
-      maxCapacity: json['max_capacity'] ?? json['maxCapacity'] ?? json['total_seats'] ?? json['totalSeats'] ?? 6,
+      id: json['id']?.toString() ?? '',
+      routeId: json['route_id']?.toString() ?? json['routeId']?.toString() ?? '',
+      route: json['route'] != null && json['route'] is Map
+          ? RouteModel.fromJson(Map<String, dynamic>.from(json['route']))
+          : null,
+      vehicleId: json['vehicle_id']?.toString() ?? json['vehicleId']?.toString() ?? '',
+      vehicle: json['vehicle'] is Map ? Map<String, dynamic>.from(json['vehicle']) : null,
+      driverId: json['driver_id']?.toString() ?? json['driverId']?.toString() ?? '',
+      driver: json['driver'] is Map ? Map<String, dynamic>.from(json['driver']) : null,
+      tripDate: json['trip_date']?.toString() ?? json['tripDate']?.toString() ?? '',
+      tripType: json['trip_type']?.toString() ?? json['tripType']?.toString() ?? 'MORNING_PICKUP',
+      scheduledDepartureTime: json['scheduled_departure_time']?.toString() ??
+          json['scheduledDepartureTime']?.toString() ??
+          '',
+      actualStartTime: json['actual_start_time']?.toString() ?? json['actualStartTime']?.toString(),
+      actualEndTime: json['actual_end_time']?.toString() ?? json['actualEndTime']?.toString(),
+      status: json['status']?.toString() ?? 'SCHEDULED',
+      maxCapacity: (json['max_capacity'] as num?)?.toInt() ??
+          (json['maxCapacity'] as num?)?.toInt() ??
+          (json['total_seats'] as num?)?.toInt() ??
+          (json['totalSeats'] as num?)?.toInt() ??
+          6,
       bookedSeats: booked,
       boardedPassengers: boarded,
       notBoardedPassengers: notBoarded,
       cancelledPassengers: cancelled,
       currentStopSequence: currentSeq,
-      liveLatitude: (json['live_latitude'] ?? json['liveLatitude'] as num?)?.toDouble(),
-      liveLongitude: (json['live_longitude'] ?? json['liveLongitude'] as num?)?.toDouble(),
-      passengers: json['passengers'],
-      delayInfo: json['delay_info'] ?? json['delayInfo'],
-      boardingSummary: json['boarding_summary'] ?? json['boardingSummary'],
+      liveLatitude: (json['live_latitude'] as num?)?.toDouble() ??
+          (json['liveLatitude'] as num?)?.toDouble(),
+      liveLongitude: (json['live_longitude'] as num?)?.toDouble() ??
+          (json['liveLongitude'] as num?)?.toDouble(),
+      passengers: json['passengers'] is List ? json['passengers'] : null,
+      delayInfo: json['delay_info'] is Map
+          ? Map<String, dynamic>.from(json['delay_info'])
+          : (json['delayInfo'] is Map ? Map<String, dynamic>.from(json['delayInfo']) : null),
+      boardingSummary: json['boarding_summary'] is Map
+          ? Map<String, dynamic>.from(json['boarding_summary'])
+          : (json['boardingSummary'] is Map
+              ? Map<String, dynamic>.from(json['boardingSummary'])
+              : null),
     );
   }
 
@@ -94,4 +122,12 @@ class TripModel {
   bool get isCancelled => status == 'CANCELLED';
   bool get hasDelay => delayInfo != null;
   int get availableSeats => (maxCapacity - bookedSeats).clamp(0, maxCapacity);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TripModel && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

@@ -1,7 +1,10 @@
 import { PaymentProvider } from '../integrations/paymentProvider';
 import { NotificationProvider } from '../integrations/notificationProvider';
+import { NotificationService } from './notificationService';
 import { PlanRepository, SubscriptionRepository } from '../repositories/subscriptionRepository';
 import { PaymentRepository } from '../repositories/paymentRepository';
+import { UserRepository } from '../repositories/userRepository';
+import { SettingsRepository } from '../repositories/settingsRepository';
 import { getSupabaseClient } from '../database/supabaseClient';
 
 export class PaymentService {
@@ -14,6 +17,20 @@ export class PaymentService {
     paymentMethod: 'UPI' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'NET_BANKING' | 'WALLET' = 'UPI',
     autoRenew = false
   ) {
+    // 1. Enforce student KYC verification check if enabled in admin settings
+    const requireKyc = await SettingsRepository.get('requireAdminKycApproval', true);
+    if (requireKyc) {
+      const studentProfile = await UserRepository.getStudentProfile(studentId);
+      if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
+        const err: any = new Error(
+          'Student KYC is pending administrative approval. Subscription purchase is only allowed once your ID documents are verified.'
+        );
+        err.statusCode = 403;
+        err.code = 'KYC_REQUIRED';
+        throw err;
+      }
+    }
+
     const plan = await PlanRepository.findById(planId);
     if (!plan) {
       const err: any = new Error('Subscription plan not found.');
@@ -141,13 +158,21 @@ export class PaymentService {
       })
       .eq('id', payment.subscription_id);
 
-    await NotificationProvider.send(
-      studentId,
-      'Subscription Activated!',
-      `Payment of ₹${payment.amount} confirmed. Your pass is now active for daily rides.`,
-      'PAYMENT',
-      { paymentId: payment.id, subscriptionId: payment.subscription_id }
-    );
+    try {
+      await NotificationService.createNotification({
+        userId: studentId,
+        recipientRole: 'STUDENT',
+        title: 'Subscription Activated!',
+        message: `Payment of ₹${payment.amount} confirmed. Your pass is now active for daily rides.`,
+        type: 'SUBSCRIPTION_ACTIVATED',
+        entityType: 'PAYMENT',
+        entityId: payment.id,
+        priority: 'HIGH',
+        data: { paymentId: payment.id, subscriptionId: payment.subscription_id, amount: payment.amount },
+      });
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
 
     return {
       success: true,

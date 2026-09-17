@@ -595,10 +595,10 @@ export declare const createComplaintSchema: z.ZodObject<{
     description: z.ZodString;
     priority: z.ZodDefault<z.ZodEnum<["LOW", "MEDIUM", "HIGH", "URGENT"]>>;
 }, "strip", z.ZodTypeAny, {
+    priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
     description: string;
     category: "DRIVER" | "BOOKING" | "PAYMENT" | "VEHICLE" | "PASS_QR" | "SUBSCRIPTION" | "LOST_ITEM" | "OTHER";
     subject: string;
-    priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 }, {
     description: string;
     category: "DRIVER" | "BOOKING" | "PAYMENT" | "VEHICLE" | "PASS_QR" | "SUBSCRIPTION" | "LOST_ITEM" | "OTHER";

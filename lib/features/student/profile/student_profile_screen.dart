@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class StudentProfileScreen extends ConsumerStatefulWidget {
@@ -146,12 +147,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
                               if (success && mounted) {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Profile updated successfully!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
+                                AppFeedback.showSuccess(context, 'Profile updated successfully!');
                               } else {
                                 setModalState(() {
                                   isLoading = false;
@@ -293,12 +289,7 @@ class _StudentProfileScreenState extends ConsumerState<StudentProfileScreen> {
 
                               if (success && mounted) {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password updated successfully!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
+                                AppFeedback.showSuccess(context, 'Password updated successfully!');
                               } else {
                                 setModalState(() {
                                   isLoading = false;

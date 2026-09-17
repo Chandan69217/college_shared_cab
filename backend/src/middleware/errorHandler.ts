@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { logger } from '../utils/logger';
 import { sendError } from '../utils/response';
+import { ERROR_CODES, USER_FRIENDLY_ERROR_MESSAGES } from '../config/errorCodes';
 
 export function errorHandler(
   err: any,
@@ -19,18 +20,20 @@ export function errorHandler(
     }));
     const message = formattedErrors.length > 0
       ? `Validation error: ${formattedErrors.map((e) => `${e.field || 'input'} (${e.message})`).join(', ')}`
-      : 'Invalid input data. Please check the submitted fields.';
+      : USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR];
 
-    sendError(res, message, 'VALIDATION_ERROR', formattedErrors, 400);
+    sendError(res, message, ERROR_CODES.VALIDATION_ERROR, formattedErrors, 400);
     return;
   }
 
   // 2. Handle Custom App Errors with explicit status code
   if (err.statusCode && typeof err.statusCode === 'number') {
+    const code = err.code || ERROR_CODES.INTERNAL_ERROR;
+    const defaultMsg = USER_FRIENDLY_ERROR_MESSAGES[code] || 'Request failed. Please check your parameters and try again.';
     sendError(
       res,
-      err.message || 'Request failed. Please check your parameters and try again.',
-      err.code || 'APP_ERROR',
+      err.message || defaultMsg,
+      code,
       err.details || null,
       err.statusCode
     );
@@ -44,8 +47,8 @@ export function errorHandler(
   if (rawMsg.includes('duplicate key') || rawMsg.includes('23505') || rawMsg.includes('already exists')) {
     sendError(
       res,
-      'A record with this information already exists in the system.',
-      'DUPLICATE_RESOURCE',
+      USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.DUPLICATE_RESOURCE],
+      ERROR_CODES.DUPLICATE_RESOURCE,
       null,
       409
     );
@@ -57,8 +60,8 @@ export function errorHandler(
     if (rawMsg.includes('update or delete on table') || req.method === 'DELETE') {
       sendError(
         res,
-        'This record cannot be permanently deleted because active operational records (such as trips, bookings, or historical records) are linked to it. Please deactivate or archive it instead.',
-        'PROTECTED_RECORD_REFERENCE',
+        USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.PROTECTED_RECORD_REFERENCE],
+        ERROR_CODES.PROTECTED_RECORD_REFERENCE,
         null,
         409
       );
@@ -67,7 +70,7 @@ export function errorHandler(
     sendError(
       res,
       'The referenced parent entity does not exist or has been removed.',
-      'INVALID_REFERENCE',
+      ERROR_CODES.VALIDATION_INVALID_DATA,
       null,
       400
     );
@@ -78,10 +81,33 @@ export function errorHandler(
   if (rawMsg.includes('invalid input syntax for type uuid') || rawMsg.includes('22P02')) {
     sendError(
       res,
-      'Invalid record identifier format provided.',
-      'INVALID_ID_FORMAT',
+      USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.INVALID_ID_FORMAT],
+      ERROR_CODES.INVALID_ID_FORMAT,
       null,
       400
+    );
+    return;
+  }
+
+  // JWT / Auth errors
+  if (rawMsg.includes('jwt expired') || rawMsg.includes('TokenExpiredError')) {
+    sendError(
+      res,
+      USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.AUTH_SESSION_EXPIRED],
+      ERROR_CODES.AUTH_SESSION_EXPIRED,
+      null,
+      401
+    );
+    return;
+  }
+
+  if (rawMsg.includes('jwt malformed') || rawMsg.includes('invalid token') || rawMsg.includes('JsonWebTokenError')) {
+    sendError(
+      res,
+      USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.AUTH_UNAUTHORIZED],
+      ERROR_CODES.AUTH_UNAUTHORIZED,
+      null,
+      401
     );
     return;
   }
@@ -90,8 +116,8 @@ export function errorHandler(
   if (rawMsg.includes('ECONNREFUSED') || rawMsg.includes('fetch failed') || rawMsg.includes('Database client not initialized')) {
     sendError(
       res,
-      'Database service is temporarily unavailable. Please try again in a few moments.',
-      'DATABASE_UNAVAILABLE',
+      USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.DATABASE_UNAVAILABLE],
+      ERROR_CODES.DATABASE_UNAVAILABLE,
       null,
       503
     );
@@ -102,11 +128,12 @@ export function errorHandler(
   sendError(
     res,
     process.env.NODE_ENV === 'production'
-      ? 'An unexpected error occurred while processing your request. Please try again later.'
-      : err.message || 'An unexpected error occurred. Please try again later.',
-    'INTERNAL_SERVER_ERROR',
+      ? USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.SERVER_ERROR]
+      : err.message || USER_FRIENDLY_ERROR_MESSAGES[ERROR_CODES.SERVER_ERROR],
+    ERROR_CODES.SERVER_ERROR,
     null,
     500
   );
 }
+
 

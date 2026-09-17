@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class DriverProfileScreen extends ConsumerStatefulWidget {
@@ -126,12 +127,7 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
 
                               if (success && mounted) {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Driver profile updated successfully!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
+                                AppFeedback.showSuccess(context, 'Driver profile updated successfully!');
                               } else {
                                 setModalState(() {
                                   isLoading = false;
@@ -273,12 +269,7 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
 
                               if (success && mounted) {
                                 Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Password updated successfully!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
+                                AppFeedback.showSuccess(context, 'Password updated successfully!');
                               } else {
                                 setModalState(() {
                                   isLoading = false;

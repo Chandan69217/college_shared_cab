@@ -14,10 +14,13 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { User, College } from '../types';
 
 export const DriversPage: React.FC = () => {
+  const toast = useToast();
   const [drivers, setDrivers] = useState<User[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -28,7 +31,6 @@ export const DriversPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
     college_id: '',
@@ -110,6 +112,7 @@ export const DriversPage: React.FC = () => {
     e.preventDefault();
     setModalError('');
     if (!formData.password || formData.password.length < 6) {
+      toast.warning('Password is required and must be at least 6 characters.');
       setModalError('Password is required and must be at least 6 characters.');
       return;
     }
@@ -117,10 +120,10 @@ export const DriversPage: React.FC = () => {
     try {
       await api.post('/admin/drivers', formData);
       setModalOpen(false);
-      setSuccessMessage(`Driver ${formData.full_name} created successfully.`);
+      toast.success(`Driver "${formData.full_name}" registered successfully.`);
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -145,10 +148,10 @@ export const DriversPage: React.FC = () => {
         status: formData.status,
       });
       setEditModalOpen(false);
-      setSuccessMessage(`Driver ${formData.full_name} updated successfully.`);
+      toast.success(`Driver "${formData.full_name}" updated successfully.`);
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -163,10 +166,10 @@ export const DriversPage: React.FC = () => {
     try {
       await api.delete(`/admin/drivers/${selectedDriver.id}`);
       setDeleteModalOpen(false);
-      setSuccessMessage(`Driver ${selectedDriver.full_name} deleted successfully.`);
+      toast.success(`Driver "${selectedDriver.full_name}" deleted successfully.`);
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -270,13 +273,6 @@ export const DriversPage: React.FC = () => {
           <span>Add New Driver</span>
         </button>
       </div>
-
-      {successMessage && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-          <span>{successMessage}</span>
-        </div>
-      )}
 
       {/* Filter Bar */}
       <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs">
@@ -569,41 +565,17 @@ export const DriversPage: React.FC = () => {
       </Modal>
 
       {/* Delete Driver Modal */}
-      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete Driver Profile">
-        {modalError && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
-            {modalError}
-          </div>
-        )}
-        <div className="space-y-4 text-xs">
-          <p className="text-slate-300">
-            Are you sure you want to permanently remove driver{' '}
-            <strong className="text-white">{selectedDriver?.full_name}</strong>?
-          </p>
-          <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-400">
-            <p className="text-[11px]">
-              <strong>Automatic Unassignment:</strong> Deleting this driver will automatically unassign them from any active routes and scheduled trips.
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setDeleteModalOpen(false)}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={actionLoading}
-              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition disabled:opacity-50"
-            >
-              {actionLoading ? 'Deleting...' : 'Confirm Delete'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        title="Remove Driver Account"
+        message={`Are you sure you want to permanently remove driver "${selectedDriver?.full_name}"? Deleting this driver will automatically unassign them from any active routes and scheduled trips.`}
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+      />
     </div>
   );
 };

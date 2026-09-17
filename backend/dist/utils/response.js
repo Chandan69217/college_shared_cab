@@ -18,6 +18,7 @@ function sendError(res, message, code = 'INTERNAL_ERROR', details = null, status
         data: null,
         error: {
             code,
+            message,
             details,
         },
     };

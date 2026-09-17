@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarCheck, MapPin, Route, CheckCircle, XCircle, RefreshCw, Filter } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export const BookingsPage: React.FC = () => {
+  const toast = useToast();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'>('ALL');
@@ -15,8 +17,9 @@ export const BookingsPage: React.FC = () => {
       if (res.data.success) {
         setBookings(res.data.data || []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch bookings:', err);
+      toast.showError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }

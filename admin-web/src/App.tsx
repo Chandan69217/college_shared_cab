@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import { ToastContainer } from './components/ToastContainer';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { StudentsPage } from './pages/StudentsPage';
@@ -23,6 +25,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { LiveTrackingPage } from './pages/LiveTrackingPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, token, isLoading } = useAuth();
@@ -44,42 +47,46 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="students" element={<StudentsPage />} />
-            <Route path="colleges" element={<CollegesPage />} />
-            <Route path="pickup-points" element={<PickupPointsPage />} />
-            <Route path="routes" element={<RoutesPage />} />
-            <Route path="vehicles" element={<VehiclesPage />} />
-            <Route path="drivers" element={<DriversPage />} />
-            <Route path="assignments" element={<AssignmentsPage />} />
-            <Route path="plans" element={<PlansPage />} />
-            <Route path="subscriptions" element={<SubscriptionsPage />} />
-            <Route path="bookings" element={<BookingsPage />} />
-            <Route path="trips" element={<TripsPage />} />
-            <Route path="live-tracking" element={<LiveTrackingPage />} />
-            <Route path="payments" element={<PaymentsPage />} />
-            <Route path="complaints" element={<ComplaintsPage />} />
-            <Route path="holidays" element={<HolidaysPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <ToastContainer />
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="students" element={<StudentsPage />} />
+              <Route path="colleges" element={<CollegesPage />} />
+              <Route path="pickup-points" element={<PickupPointsPage />} />
+              <Route path="routes" element={<RoutesPage />} />
+              <Route path="vehicles" element={<VehiclesPage />} />
+              <Route path="drivers" element={<DriversPage />} />
+              <Route path="assignments" element={<AssignmentsPage />} />
+              <Route path="plans" element={<PlansPage />} />
+              <Route path="subscriptions" element={<SubscriptionsPage />} />
+              <Route path="bookings" element={<BookingsPage />} />
+              <Route path="trips" element={<TripsPage />} />
+              <Route path="live-tracking" element={<LiveTrackingPage />} />
+              <Route path="payments" element={<PaymentsPage />} />
+              <Route path="complaints" element={<ComplaintsPage />} />
+              <Route path="holidays" element={<HolidaysPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ToastProvider>
   );
 };

@@ -16,9 +16,11 @@ import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { StatCard } from '../components/StatCard';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { RouteAssignment, Vehicle, User } from '../types';
 
 export const AssignmentsPage: React.FC = () => {
+  const toast = useToast();
   const [routes, setRoutes] = useState<RouteAssignment[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
   const [availableDrivers, setAvailableDrivers] = useState<User[]>([]);
@@ -30,7 +32,6 @@ export const AssignmentsPage: React.FC = () => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const fetchAssignments = async () => {
     setLoading(true);
@@ -46,7 +47,7 @@ export const AssignmentsPage: React.FC = () => {
         setAvailableDrivers(res.data.data.availableDrivers || []);
       }
     } catch (err: any) {
-      console.error('Failed to fetch assignments matrix', err);
+      toast.error(err);
     } finally {
       setLoading(false);
     }
@@ -78,12 +79,12 @@ export const AssignmentsPage: React.FC = () => {
       });
 
       if (res.data.success) {
-        setSuccessMessage(`Resource allocation updated for ${selectedAssignment.routeName}.`);
+        toast.success(`Resource allocation updated for ${selectedAssignment.routeName}.`);
         setReassignModalOpen(false);
         fetchAssignments();
-        setTimeout(() => setSuccessMessage(''), 4000);
       }
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -199,13 +200,6 @@ export const AssignmentsPage: React.FC = () => {
           <span>Refresh Matrix</span>
         </button>
       </div>
-
-      {successMessage && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-          <span>{successMessage}</span>
-        </div>
-      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

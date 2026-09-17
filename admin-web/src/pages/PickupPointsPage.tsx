@@ -12,16 +12,18 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { LocationPickerMap } from '../components/LocationPickerMap';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { PickupPoint, College } from '../types';
 
 export const PickupPointsPage: React.FC = () => {
+  const toast = useToast();
   const [points, setPoints] = useState<PickupPoint[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Filter state
   const [approvalFilter, setApprovalFilter] = useState<'ALL' | 'APPROVED' | 'PENDING'>('ALL');
@@ -46,11 +48,6 @@ export const PickupPointsPage: React.FC = () => {
     is_active: true,
   });
 
-  const showSuccess = (msg: string) => {
-    setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(null), 4000);
-  };
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -59,7 +56,6 @@ export const PickupPointsPage: React.FC = () => {
         api.get('/admin/pickup-points'),
         api.get('/admin/colleges'),
       ]);
-
       if (pointsRes.data.success) {
         setPoints(pointsRes.data.data);
       }
@@ -67,7 +63,9 @@ export const PickupPointsPage: React.FC = () => {
         setColleges(collegesRes.data.data);
       }
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setError(msg);
+      toast.error(err);
     } finally {
       setLoading(false);
     }
@@ -121,11 +119,12 @@ export const PickupPointsPage: React.FC = () => {
     try {
       const res = await api.post('/admin/pickup-points', formData);
       if (res.data.success) {
-        showSuccess(`Pickup point "${formData.name}" created successfully!`);
+        toast.success(`Pickup point "${formData.name}" added successfully!`);
         setIsAddModalOpen(false);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -140,11 +139,12 @@ export const PickupPointsPage: React.FC = () => {
     try {
       const res = await api.put(`/admin/pickup-points/${selectedPoint.id}`, formData);
       if (res.data.success) {
-        showSuccess(`Pickup point "${formData.name}" updated successfully!`);
+        toast.success(`Pickup point "${formData.name}" updated successfully!`);
         setIsEditModalOpen(false);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -158,11 +158,12 @@ export const PickupPointsPage: React.FC = () => {
     try {
       const res = await api.delete(`/admin/pickup-points/${selectedPoint.id}`);
       if (res.data.success) {
-        showSuccess(`Pickup point removed successfully.`);
+        toast.success(`Pickup point removed successfully.`);
         setIsDeleteModalOpen(false);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -276,13 +277,6 @@ export const PickupPointsPage: React.FC = () => {
         <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{successMessage}</span>
         </div>
       )}
 
@@ -636,45 +630,17 @@ export const PickupPointsPage: React.FC = () => {
       </Modal>
 
       {/* DELETE CONFIRMATION MODAL */}
-      <Modal
+      <ConfirmDialog
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeletePoint}
         title="Remove Pickup Stop"
-      >
-        <div className="space-y-4 text-xs">
-          {error && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-          <p className="text-slate-300">
-            Are you sure you want to delete pickup stop{' '}
-            <strong className="text-white">{selectedPoint?.name}</strong>?
-          </p>
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-slate-400">
-            <p className="text-[11px]">
-              <strong>Safety Protection:</strong> Physical deletion is automatically blocked if this
-              stop is currently used in active route stops or scheduled student bookings.
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              onClick={() => setIsDeleteModalOpen(false)}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDeletePoint}
-              disabled={actionLoading}
-              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition disabled:opacity-50"
-            >
-              {actionLoading ? 'Deleting...' : 'Confirm Delete'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        message={`Are you sure you want to permanently remove "${selectedPoint?.name}"? This action is blocked if active route stops or passenger bookings are assigned to it.`}
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+      />
     </div>
   );
 };

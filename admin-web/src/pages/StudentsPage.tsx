@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   XCircle,
@@ -18,18 +19,30 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { User, College } from '../types';
 
 export const StudentsPage: React.FC = () => {
+  const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = (searchParams.get('status')?.toUpperCase() || 'ALL') as
+    | 'ALL'
+    | 'VERIFIED'
+    | 'PENDING'
+    | 'REJECTED'
+    | 'SUSPENDED';
+
   const [students, setStudents] = useState<User[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Filter state
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'REJECTED' | 'SUSPENDED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'VERIFIED' | 'PENDING' | 'REJECTED' | 'SUSPENDED'>(
+    ['ALL', 'VERIFIED', 'PENDING', 'REJECTED', 'SUSPENDED'].includes(initialStatus) ? initialStatus : 'ALL'
+  );
   const [selectedCollegeFilter, setSelectedCollegeFilter] = useState<string>('ALL');
 
   // Bulk Selection
@@ -87,9 +100,19 @@ export const StudentsPage: React.FC = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const s = searchParams.get('status')?.toUpperCase();
+    if (s && ['ALL', 'VERIFIED', 'PENDING', 'REJECTED', 'SUSPENDED'].includes(s)) {
+      setStatusFilter(s as any);
+    }
+    const c = searchParams.get('college_id');
+    if (c) {
+      setSelectedCollegeFilter(c);
+    }
+  }, [searchParams]);
+
   const showSuccess = (msg: string) => {
-    setSuccessMessage(msg);
-    setTimeout(() => setSuccessMessage(null), 4000);
+    toast.showSuccess(msg);
   };
 
   const handleOpenAdd = () => {
@@ -159,11 +182,12 @@ export const StudentsPage: React.FC = () => {
       });
 
       if (res.data.success) {
-        showSuccess(`Student ${formData.full_name} enrolled successfully!`);
+        toast.success(`Student "${formData.full_name}" enrolled successfully!`);
         setIsAddModalOpen(false);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -189,11 +213,12 @@ export const StudentsPage: React.FC = () => {
       });
 
       if (res.data.success) {
-        showSuccess(`Student ${formData.full_name} updated successfully!`);
+        toast.success(`Student "${formData.full_name}" updated successfully!`);
         setIsEditModalOpen(false);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -207,12 +232,13 @@ export const StudentsPage: React.FC = () => {
     try {
       const res = await api.delete(`/admin/students/${selectedStudent.id}`);
       if (res.data.success) {
-        showSuccess(`Student record removed successfully.`);
+        toast.success(`Student record removed successfully.`);
         setIsDeleteModalOpen(false);
         setSelectedIds(prev => prev.filter(id => id !== selectedStudent.id));
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -228,11 +254,12 @@ export const StudentsPage: React.FC = () => {
         status,
         notes: verificationNotes,
       });
-      showSuccess(`KYC status updated to ${status} for ${kycStudent.full_name}`);
+      toast.success(`Student KYC status updated to ${status}.`);
       setKycStudent(null);
       setVerificationNotes('');
       fetchData();
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -260,11 +287,12 @@ export const StudentsPage: React.FC = () => {
       });
 
       if (res.data.success) {
-        showSuccess(`Bulk updated ${selectedIds.length} student(s) successfully!`);
+        toast.success(`Bulk updated ${selectedIds.length} student(s) successfully!`);
         setSelectedIds([]);
         fetchData();
       }
     } catch (err) {
+      toast.error(err);
       setError(getApiErrorMessage(err));
     } finally {
       setBulkLoading(false);
@@ -408,13 +436,6 @@ export const StudentsPage: React.FC = () => {
         <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{successMessage}</span>
         </div>
       )}
 
@@ -847,49 +868,17 @@ export const StudentsPage: React.FC = () => {
       </Modal>
 
       {/* DELETE CONFIRMATION MODAL */}
-      <Modal
+      <ConfirmDialog
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDeleteStudent}
         title="Remove Student Record"
-      >
-        <div className="space-y-4 text-xs">
-          {error && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-          <p className="text-slate-300">
-            Are you sure you want to delete student{' '}
-            <strong className="text-white">{selectedStudent?.full_name}</strong> (
-            <span className="font-mono text-emerald-400">
-              {selectedStudent?.profile?.student_id_number || selectedStudent?.email}
-            </span>
-            )?
-          </p>
-          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-slate-400">
-            <p className="text-[11px]">
-              <strong>Safety Protection:</strong> Physical deletion is automatically blocked if this
-              student has active ride bookings or an active commuter subscription.
-            </p>
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              onClick={() => setIsDeleteModalOpen(false)}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDeleteStudent}
-              disabled={actionLoading}
-              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold transition disabled:opacity-50"
-            >
-              {actionLoading ? 'Deleting...' : 'Confirm Delete'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        message={`Are you sure you want to permanently delete student "${selectedStudent?.full_name}" (${selectedStudent?.profile?.student_id_number || selectedStudent?.email})? Physical deletion will be rejected if the student has active ride bookings or an active commuter pass.`}
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+      />
 
       {/* KYC REVIEW MODAL */}
       <Modal

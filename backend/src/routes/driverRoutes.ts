@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { DriverController } from '../controllers/driverController';
+import { TripController } from '../controllers/tripController';
 import { authenticateJwt } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { auditLog } from '../middleware/auditLog';
@@ -16,6 +17,7 @@ router.get('/trips/:tripId', DriverController.getTripDetails);
 router.get('/trips/:tripId/manifest', DriverController.getManifest);
 router.post('/trips/:tripId/start', auditLog('START_TRIP', 'trips'), DriverController.startTrip);
 router.post('/trips/:tripId/end', auditLog('END_TRIP', 'trips'), DriverController.endTrip);
+router.post('/trips/:tripId/location', TripController.updateLocation);
 router.post('/trips/:tripId/delay', auditLog('REPORT_DELAY', 'trips'), DriverController.reportDelay);
 router.patch('/trips/:tripId/passengers/:studentId', auditLog('UPDATE_PASSENGER_STATUS', 'trip_passengers'), DriverController.updatePassengerStatus);
 

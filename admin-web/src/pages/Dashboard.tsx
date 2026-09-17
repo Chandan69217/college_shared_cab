@@ -120,14 +120,21 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {stats.pendingVerifications > 0 && (
+          {stats.pendingVerifications > 0 ? (
             <Link
-              to="/students"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium hover:bg-amber-500/20 transition"
+              to="/students?status=PENDING"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition shadow-sm animate-pulse"
+              title="Click to review pending student KYC applications"
             >
               <AlertCircle className="w-4 h-4" />
               <span>{stats.pendingVerifications} Pending KYC Reviews</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
             </Link>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+              <ShieldCheck className="w-4 h-4" />
+              <span>All Student KYCs Verified</span>
+            </div>
           )}
           {stats.maintenanceVehicles && stats.maintenanceVehicles > 0 ? (
             <Link
@@ -146,7 +153,11 @@ export const Dashboard: React.FC = () => {
         <StatCard
           title="Students Directory"
           value={stats.totalStudents.toLocaleString()}
-          subtitle={`${stats.verifiedStudents ?? stats.activeStudents ?? 0} verified accounts`}
+          subtitle={
+            stats.pendingVerifications > 0
+              ? `${stats.pendingVerifications} pending KYC • ${stats.verifiedStudents ?? stats.activeStudents ?? 0} verified`
+              : `${stats.verifiedStudents ?? stats.activeStudents ?? 0} verified accounts`
+          }
           icon={Users}
           color="blue"
         />
@@ -248,14 +259,21 @@ export const Dashboard: React.FC = () => {
           </Link>
 
           <Link
-            to="/students"
+            to={stats.pendingVerifications > 0 ? "/students?status=PENDING" : "/students"}
             className="flex items-center justify-between p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-800/50 transition group text-xs"
           >
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
               <span className="font-semibold text-slate-200">Students & KYC</span>
             </div>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+            <div className="flex items-center gap-1.5">
+              {stats.pendingVerifications > 0 && (
+                <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-[10px]">
+                  {stats.pendingVerifications} Pending
+                </span>
+              )}
+              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all" />
+            </div>
           </Link>
 
           <Link

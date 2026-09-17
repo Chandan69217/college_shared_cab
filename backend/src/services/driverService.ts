@@ -3,6 +3,7 @@ import { UserRepository } from '../repositories/userRepository';
 import { TripRepository } from '../repositories/tripRepository';
 import { getSupabaseClient } from '../database/supabaseClient';
 import { NotificationProvider } from '../integrations/notificationProvider';
+import { NotificationService } from './notificationService';
 
 export class DriverService {
   /**
@@ -184,10 +185,34 @@ export class DriverService {
       throw err;
     }
 
-    return TripRepository.update(tripId, {
+    const updatedTrip = await TripRepository.update(tripId, {
       status: 'IN_PROGRESS',
       actual_start_time: new Date().toISOString(),
     });
+
+    // Notify all booked passengers that the trip has started
+    try {
+      const passengers = await TripRepository.getTripPassengers(tripId);
+      for (const p of passengers) {
+        if (p.student_id) {
+          await NotificationService.createNotification({
+            userId: p.student_id,
+            recipientRole: 'STUDENT',
+            title: 'Trip Started!',
+            message: `Your cab has started its journey on Route "${trip.route?.name || 'Assigned Route'}". Track live location in the app.`,
+            type: 'TRIP_STARTED',
+            entityType: 'TRIP',
+            entityId: tripId,
+            priority: 'HIGH',
+            data: { tripId, routeId: trip.route_id },
+          });
+        }
+      }
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
+
+    return updatedTrip;
   }
 
   /**
@@ -228,10 +253,34 @@ export class DriverService {
         .eq('status', 'ACTIVE');
     }
 
-    return TripRepository.update(tripId, {
+    const updatedTrip = await TripRepository.update(tripId, {
       status: 'COMPLETED',
       actual_end_time: now,
     });
+
+    // Notify all passengers that the trip has completed
+    try {
+      const passengers = await TripRepository.getTripPassengers(tripId);
+      for (const p of passengers) {
+        if (p.student_id) {
+          await NotificationService.createNotification({
+            userId: p.student_id,
+            recipientRole: 'STUDENT',
+            title: 'Trip Completed',
+            message: `The trip on Route "${trip.route?.name || 'Assigned Route'}" has concluded. Thank you for riding with us!`,
+            type: 'TRIP_COMPLETED',
+            entityType: 'TRIP',
+            entityId: tripId,
+            priority: 'NORMAL',
+            data: { tripId },
+          });
+        }
+      }
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
+
+    return updatedTrip;
   }
 
   /**
@@ -282,19 +331,21 @@ export class DriverService {
 
     if (error) throw new Error(`Record delay error: ${error.message}`);
 
-    // 2. Delay recorded in delay_reports (trip remains SCHEDULED or IN_PROGRESS)
-
-    // 3. Notify all booked passengers
+    // 2. Notify all booked passengers with HIGH priority TRIP_DELAYED
     const passengers = await TripRepository.getTripPassengers(tripId);
     for (const p of passengers) {
       if (p.student_id) {
-        await NotificationProvider.send(
-          p.student_id,
-          'Trip Delay Notice',
-          `Your vehicle on Route "${trip.route?.name || 'Assigned Route'}" is delayed by approx ${data.delayMinutes || 15} mins. Reason: ${data.reason}`,
-          'TRIP',
-          { tripId, delayMinutes: data.delayMinutes, reason: data.reason }
-        );
+        await NotificationService.createNotification({
+          userId: p.student_id,
+          recipientRole: 'STUDENT',
+          title: 'Trip Delay Notice',
+          message: `Your vehicle on Route "${trip.route?.name || 'Assigned Route'}" is delayed by approx ${data.delayMinutes || 15} mins. Reason: ${data.reason}`,
+          type: 'TRIP_DELAYED',
+          entityType: 'TRIP',
+          entityId: tripId,
+          priority: 'HIGH',
+          data: { tripId, delayMinutes: data.delayMinutes, reason: data.reason },
+        });
       }
     }
 
@@ -343,10 +394,22 @@ export class DriverService {
 
     if (error) throw new Error(`Update passenger status error: ${error.message}`);
 
-    // If marked BOARDED, update boarded count
+    // If marked BOARDED, update boarded count and send notification
     if (status === 'BOARDED') {
       await TripRepository.update(tripId, {
         boarded_passengers: (trip.boarded_passengers || 0) + 1,
+      });
+
+      await NotificationService.createNotification({
+        userId: studentId,
+        recipientRole: 'STUDENT',
+        title: 'Boarding Confirmed',
+        message: 'Your boarding status has been confirmed by the driver. Have a safe ride!',
+        type: 'BOARDING_CONFIRMED',
+        entityType: 'TRIP',
+        entityId: tripId,
+        priority: 'NORMAL',
+        data: { tripId },
       });
     }
 

@@ -2,12 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BookingService = void 0;
 const crypto_1 = require("../utils/crypto");
-const notificationProvider_1 = require("../integrations/notificationProvider");
+const notificationService_1 = require("./notificationService");
 const bookingRepository_1 = require("../repositories/bookingRepository");
 const userRepository_1 = require("../repositories/userRepository");
 const tripRepository_1 = require("../repositories/tripRepository");
 const subscriptionRepository_1 = require("../repositories/subscriptionRepository");
 const pickupPointRepository_1 = require("../repositories/pickupPointRepository");
+const settingsRepository_1 = require("../repositories/settingsRepository");
 const supabaseClient_1 = require("../database/supabaseClient");
 const geo_1 = require("../utils/geo");
 class BookingService {
@@ -16,6 +17,15 @@ class BookingService {
      * Check route, stop validity and live cab availability before booking
      */
     static async checkAvailability(studentId, routeId, pickupPointId, dropPointId, tripId, tripType) {
+        const isMaintenance = await settingsRepository_1.SettingsRepository.get('maintenanceMode', false);
+        if (isMaintenance) {
+            return {
+                available: false,
+                reason: 'MAINTENANCE_MODE',
+                message: 'Platform is temporarily paused for scheduled maintenance.',
+                trips: [],
+            };
+        }
         const supabase = (0, supabaseClient_1.getSupabaseClient)();
         const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
         if (!pickupPointId) {
@@ -26,15 +36,18 @@ class BookingService {
                 trips: [],
             };
         }
-        // 1. Verify student profile verification status
-        const studentProfile = await userRepository_1.UserRepository.getStudentProfile(studentId);
-        if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
-            return {
-                available: false,
-                reason: 'STUDENT_NOT_VERIFIED',
-                message: 'Student account is pending administrative verification. Booking is disabled.',
-                trips: [],
-            };
+        // 1. Verify student profile verification status if requireAdminKycApproval is enabled
+        const requireKyc = await settingsRepository_1.SettingsRepository.get('requireAdminKycApproval', true);
+        if (requireKyc) {
+            const studentProfile = await userRepository_1.UserRepository.getStudentProfile(studentId);
+            if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
+                return {
+                    available: false,
+                    reason: 'STUDENT_NOT_VERIFIED',
+                    message: 'Student account is pending administrative verification. Booking is disabled.',
+                    trips: [],
+                };
+            }
         }
         // 2. Verify subscription
         const activeSub = await subscriptionRepository_1.SubscriptionRepository.findActiveByStudentId(studentId);
@@ -225,13 +238,24 @@ class BookingService {
         });
         this.tripLocks.set(tripId, lockPromise);
         try {
-            // 1. Verify student profile verification status in Supabase
-            const studentProfile = await userRepository_1.UserRepository.getStudentProfile(studentId);
-            if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
-                const err = new Error('Student account is pending administrative verification. Booking is disabled.');
-                err.statusCode = 403;
-                err.code = 'STUDENT_NOT_VERIFIED';
+            // 0. Maintenance Mode Check
+            const isMaintenance = await settingsRepository_1.SettingsRepository.get('maintenanceMode', false);
+            if (isMaintenance) {
+                const err = new Error('Transportation booking is temporarily suspended for scheduled system maintenance.');
+                err.statusCode = 503;
+                err.code = 'MAINTENANCE_MODE';
                 throw err;
+            }
+            // 1. Verify student profile verification status if enabled
+            const requireKyc = await settingsRepository_1.SettingsRepository.get('requireAdminKycApproval', true);
+            if (requireKyc) {
+                const studentProfile = await userRepository_1.UserRepository.getStudentProfile(studentId);
+                if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
+                    const err = new Error('Student account is pending administrative verification. Booking is disabled.');
+                    err.statusCode = 403;
+                    err.code = 'STUDENT_NOT_VERIFIED';
+                    throw err;
+                }
             }
             // 2. Verify Trip exists & is in eligible status (SCHEDULED or IN_PROGRESS)
             const trip = await tripRepository_1.TripRepository.findById(tripId);
@@ -368,7 +392,32 @@ class BookingService {
                 .select('*')
                 .eq('id', passId)
                 .single();
-            await notificationProvider_1.NotificationProvider.send(studentId, 'Ride Booked Successfully!', `Seat #${seatNumber} confirmed on scheduled trip. Your daily pass is ready.`, 'BOOKING', { bookingId, passId, tripId });
+            // Student booking notification
+            await notificationService_1.NotificationService.createNotification({
+                userId: studentId,
+                recipientRole: 'STUDENT',
+                title: 'Ride Booked Successfully!',
+                message: `Seat #${seatNumber} confirmed on scheduled trip. Your daily travel pass is ready.`,
+                type: 'BOOKING_CREATED',
+                entityType: 'BOOKING',
+                entityId: bookingId,
+                priority: 'NORMAL',
+                data: { bookingId, passId, tripId, seatNumber, pickupPointId },
+            });
+            // Driver notification if driver is assigned
+            if (trip.driver_id) {
+                await notificationService_1.NotificationService.createNotification({
+                    userId: trip.driver_id,
+                    recipientRole: 'DRIVER',
+                    title: 'New Passenger Booked',
+                    message: `Seat #${seatNumber} booked at ${pickupPoint.name}.`,
+                    type: 'BOOKING_CREATED',
+                    entityType: 'BOOKING',
+                    entityId: bookingId,
+                    priority: 'NORMAL',
+                    data: { bookingId, tripId, seatNumber, pickupPointId },
+                });
+            }
             return {
                 booking: { ...(createdBooking || {}), seat_number: seatNumber, trip, pickup_point: pickupPoint, drop_point: dropPoint },
                 pass: { ...(createdPass || {}), qr_code_data: realQrToken, trip, pickup_point: pickupPoint, drop_point: dropPoint },
@@ -428,7 +477,32 @@ class BookingService {
                 remaining_rides: (sub.remaining_rides || 0) + 1,
             });
         }
-        await notificationProvider_1.NotificationProvider.send(studentId, 'Ride Booking Cancelled', `Booking for ${booking.booking_date} has been cancelled. 1 ride credit refunded.`, 'BOOKING');
+        // Student notification
+        await notificationService_1.NotificationService.createNotification({
+            userId: studentId,
+            recipientRole: 'STUDENT',
+            title: 'Ride Booking Cancelled',
+            message: `Booking for ${booking.booking_date} has been cancelled. 1 ride credit refunded.`,
+            type: 'BOOKING_CANCELLED',
+            entityType: 'BOOKING',
+            entityId: bookingId,
+            priority: 'NORMAL',
+            data: { bookingId, tripId: booking.trip_id },
+        });
+        // Driver notification
+        if (trip && trip.driver_id) {
+            await notificationService_1.NotificationService.createNotification({
+                userId: trip.driver_id,
+                recipientRole: 'DRIVER',
+                title: 'Passenger Cancelled Booking',
+                message: `A passenger cancelled their booking for today's trip.`,
+                type: 'BOOKING_CANCELLED',
+                entityType: 'BOOKING',
+                entityId: bookingId,
+                priority: 'LOW',
+                data: { bookingId, tripId: trip.id },
+            });
+        }
     }
 }
 exports.BookingService = BookingService;

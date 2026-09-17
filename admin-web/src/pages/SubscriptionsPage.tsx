@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Layers, Calendar, CheckCircle, Clock, XCircle, AlertCircle, RefreshCw, Filter } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export const SubscriptionsPage: React.FC = () => {
+  const toast = useToast();
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PENDING_PAYMENT' | 'EXPIRED' | 'CANCELLED'>('ALL');
@@ -14,8 +16,9 @@ export const SubscriptionsPage: React.FC = () => {
       const res = await api.get('/admin/subscriptions');
       const list = res.data?.data || [];
       setSubscriptions(list);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch subscriptions:', err);
+      toast.showError(getApiErrorMessage(err));
       setSubscriptions([]);
     } finally {
       setLoading(false);

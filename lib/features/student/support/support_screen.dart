@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/settings_service.dart';
+import '../../../core/utils/app_feedback.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -58,15 +60,11 @@ class _SupportScreenState extends State<SupportScreen> {
 
   Future<void> _handleSubmitTicket() async {
     if (_subjectController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subject is required.'), backgroundColor: AppColors.error),
-      );
+      AppFeedback.showWarning(context, 'Subject is required.');
       return;
     }
     if (_descController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Description is required.'), backgroundColor: AppColors.error),
-      );
+      AppFeedback.showWarning(context, 'Description is required.');
       return;
     }
 
@@ -82,19 +80,12 @@ class _SupportScreenState extends State<SupportScreen> {
       if (res.data['success'] == true && mounted) {
         _subjectController.clear();
         _descController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Support ticket created successfully.')),
-        );
+        AppFeedback.showSuccess(context, 'Support ticket created successfully.');
         _fetchTickets();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -170,6 +161,10 @@ class _SupportScreenState extends State<SupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final supportPhone = SettingsService.instance.supportPhone;
+    final supportEmail = SettingsService.instance.supportEmail;
+    final sosBroadcastEnabled = SettingsService.instance.emergencySosBroadcast;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -180,60 +175,104 @@ class _SupportScreenState extends State<SupportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Campus SOS Button Card
+            // Campus Helpdesk Contact Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF881337),
-                    AppColors.surfaceCard,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: AppColors.surfaceCard,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.accentRose.withOpacity(0.4)),
+                border: Border.all(color: const Color(0xFF374151)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentRose.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.emergency_rounded, color: AppColors.accentRose, size: 28),
+                  const Text(
+                    'Campus Transport Helpline',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Campus Safety SOS',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Instant broadcast to campus security patrol',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(Icons.phone_in_talk_rounded, color: AppColors.primaryLight, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        supportPhone,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ],
                   ),
-                  ElevatedButton(
-                    onPressed: _triggerSos,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentRose,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    ),
-                    child: const Text('SOS', style: TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.email_outlined, color: AppColors.primaryLight, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        supportEmail,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Campus SOS Button Card
+            if (sosBroadcastEnabled) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF881337),
+                      AppColors.surfaceCard,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.accentRose.withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentRose.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.emergency_rounded, color: AppColors.accentRose, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Campus Safety SOS',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Instant broadcast to campus security patrol',
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: _triggerSos,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accentRose,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      ),
+                      child: const Text('SOS', style: TextStyle(fontWeight: FontWeight.w900)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // Submit Complaint Form
             Container(

@@ -1,8 +1,10 @@
 import { NotificationProvider } from '../integrations/notificationProvider';
+import { NotificationService } from './notificationService';
 import { StudentProfile } from '../types';
 import { UserRepository } from '../repositories/userRepository';
 import { SubscriptionRepository } from '../repositories/subscriptionRepository';
 import { BookingRepository } from '../repositories/bookingRepository';
+import { SettingsRepository } from '../repositories/settingsRepository';
 
 export class StudentService {
   /**
@@ -27,12 +29,16 @@ export class StudentService {
       verification_status: 'PENDING',
     });
 
-    await NotificationProvider.send(
-      studentId,
-      'Verification Under Review',
-      'Your student ID documents have been submitted and are pending administrative verification.',
-      'GENERAL'
-    );
+    await NotificationService.createNotification({
+      userId: studentId,
+      recipientRole: 'STUDENT',
+      title: 'Verification Under Review',
+      message: 'Your student ID documents have been submitted and are pending administrative verification.',
+      type: 'KYC_SUBMITTED',
+      entityType: 'KYC',
+      entityId: studentId,
+      priority: 'NORMAL',
+    });
 
     return profile;
   }
@@ -55,6 +61,8 @@ export class StudentService {
       todaysPass = await BookingRepository.findDailyPass(todaysBooking.id);
     }
 
+    const unreadNotificationsCount = await NotificationService.getUnreadCount(studentId);
+
     return {
       user: {
         id: user?.id,
@@ -67,7 +75,7 @@ export class StudentService {
       activeSubscription,
       todaysBooking,
       todaysPass,
-      unreadNotificationsCount: 0,
+      unreadNotificationsCount,
     };
   }
 
@@ -87,12 +95,15 @@ export class StudentService {
       'EMERGENCY'
     );
 
-    await NotificationProvider.broadcastToRole(
-      'ALL',
-      'EMERGENCY SOS ALERT',
-      `Student ${user?.full_name || 'Unknown'} (${user?.phone || 'N/A'}) triggered an SOS emergency alert.`,
-      'EMERGENCY'
-    );
+    const broadcastEnabled = await SettingsRepository.get('emergencySosBroadcast', true);
+    if (broadcastEnabled) {
+      await NotificationProvider.broadcastToRole(
+        'ALL',
+        'EMERGENCY SOS ALERT',
+        `Student ${user?.full_name || 'Unknown'} (${user?.phone || 'N/A'}) triggered an SOS emergency alert.`,
+        'EMERGENCY'
+      );
+    }
 
     return {
       success: true,

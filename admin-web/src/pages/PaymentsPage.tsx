@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { DollarSign, CheckCircle, Clock, XCircle, RefreshCw } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export const PaymentsPage: React.FC = () => {
+  const toast = useToast();
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -15,8 +17,9 @@ export const PaymentsPage: React.FC = () => {
       if (res.data.success) {
         setPayments(res.data.data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.showError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }

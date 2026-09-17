@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/api/api_client.dart';
-import '../../../core/models/trip_model.dart';
 import '../../../core/services/gps_tracking_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 
 class DriverTripDetailSheet extends StatefulWidget {
   final String tripId;
@@ -81,32 +82,22 @@ class _DriverTripDetailSheetState extends State<DriverTripDetailSheet> {
     try {
       final res = await apiClient.post('/trips/$tripId/start');
       if (res.data['success'] == true) {
-        await _gpsService.startTracking(tripId);
+        final route = _tripData?['route'];
+        final vehicle = _tripData?['vehicle'];
+        await _gpsService.startTracking(
+          tripId,
+          routeName: route?['name'],
+          vehiclePlate: vehicle?['vehicle_number'],
+        );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.gps_fixed_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('Trip Started! Live GPS location sharing is active.')),
-                ],
-              ),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Trip Started! Live GPS location sharing is active.');
           _fetchTripDetails();
           widget.onTripUpdated?.call();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
@@ -120,30 +111,14 @@ class _DriverTripDetailSheetState extends State<DriverTripDetailSheet> {
       if (res.data['success'] == true) {
         await _gpsService.stopTracking();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('Trip Completed! GPS tracking stopped.')),
-                ],
-              ),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Trip Completed! GPS tracking stopped.');
           _fetchTripDetails();
           widget.onTripUpdated?.call();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
@@ -151,9 +126,17 @@ class _DriverTripDetailSheetState extends State<DriverTripDetailSheet> {
   }
 
   void _showPermissionAlert(LocationPermissionState state) {
+    String title = 'Location Permission Required';
     String message = 'Please enable device GPS to share live location during active transit.';
-    if (state == LocationPermissionState.permanentlyDenied) {
+    bool isPermanent = false;
+
+    if (state == LocationPermissionState.serviceDisabled) {
+      title = 'Device GPS Disabled';
+      message = 'Please turn on GPS / Location Services in your device quick settings.';
+    } else if (state == LocationPermissionState.permanentlyDenied) {
+      title = 'Permission Permanently Denied';
       message = 'Location access is permanently disabled. Please allow location permissions in device settings.';
+      isPermanent = true;
     }
 
     showDialog(
@@ -161,13 +144,28 @@ class _DriverTripDetailSheetState extends State<DriverTripDetailSheet> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('GPS Permission Required', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_off_rounded, color: AppColors.accentRose, size: 22),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
         content: Text(message, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Dismiss', style: TextStyle(color: AppColors.textMuted)),
           ),
+          if (isPermanent)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentBlue),
+              child: const Text('Open Settings'),
+            ),
         ],
       ),
     );
@@ -265,24 +263,14 @@ class _DriverTripDetailSheetState extends State<DriverTripDetailSheet> {
                         });
                         if (res.data['success'] == true && mounted) {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Delay of +$delayMinutes mins reported. Booked students notified.'),
-                              backgroundColor: AppColors.primary,
-                            ),
-                          );
+                          AppFeedback.showSuccess(context, 'Delay of +$delayMinutes mins reported. Booked students notified.');
                           _fetchTripDetails();
                           widget.onTripUpdated?.call();
                         }
                       } catch (e) {
                         setDialogState(() => isSubmitting = false);
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(ApiClient.getErrorMessage(e)),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
+                          AppFeedback.showError(context, e);
                         }
                       }
                     },

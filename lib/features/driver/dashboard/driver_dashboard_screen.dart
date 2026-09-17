@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/services/gps_tracking_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../trips/driver_scheduled_trips_screen.dart';
 import '../trips/driver_trip_detail_sheet.dart';
@@ -38,14 +42,21 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
           _isLoading = false;
         });
 
-        // Resume background tracking if active trip is in progress
+        // Resume real background GPS tracking if active trip is in progress
         final activeTrip = data?['activeTrip'];
         if (activeTrip != null &&
             activeTrip['status'] == 'IN_PROGRESS' &&
             !_gpsService.currentStatus.isTracking) {
-          _gpsService.startTracking(activeTrip['id']);
+          final routeName = activeTrip['route']?['name']?.toString() ?? activeTrip['route_name']?.toString();
+          final vehiclePlate = activeTrip['vehicle']?['vehicle_number']?.toString() ?? activeTrip['vehicle']?['number']?.toString();
+          _gpsService.startTracking(
+            activeTrip['id'],
+            routeName: routeName,
+            vehiclePlate: vehiclePlate,
+          );
         }
       }
+      NotificationService.instance.fetchUnreadCount();
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -55,12 +66,13 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
   void initState() {
     super.initState();
     _fetchDashboard(isInitial: true);
+    NotificationService.instance.fetchUnreadCount();
   }
 
   Future<void> _handleStartTrip(String tripId) async {
     setState(() => _isActionLoading = true);
 
-    // 1. Request GPS Permission first
+    // 1. Request Real Device GPS Permission first
     final permState = await _gpsService.checkAndRequestPermission();
     if (permState != LocationPermissionState.granted) {
       if (mounted) {
@@ -73,33 +85,25 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
     try {
       final res = await apiClient.post('/trips/$tripId/start');
       if (res.data['success'] == true) {
-        // 2. Start Live GPS Tracking Stream
-        await _gpsService.startTracking(tripId);
+        final activeTrip = _dashboardData?['activeTrip'];
+        final routeName = activeTrip?['route']?['name']?.toString() ?? activeTrip?['route_name']?.toString();
+        final vehiclePlate = activeTrip?['vehicle']?['vehicle_number']?.toString() ?? activeTrip?['vehicle']?['number']?.toString();
+
+        // 2. Start Real Device Background GPS Foreground Service
+        await _gpsService.startTracking(
+          tripId,
+          routeName: routeName,
+          vehiclePlate: vehiclePlate,
+        );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.gps_fixed_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('Trip Started! Live GPS location sharing is active.')),
-                ],
-              ),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Trip Started! Real-time background GPS tracking is active.');
           _fetchDashboard();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
@@ -115,29 +119,13 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
         await _gpsService.stopTracking();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('Trip Completed! GPS tracking stopped.')),
-                ],
-              ),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Trip Completed! GPS tracking stopped.');
           _fetchDashboard();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isActionLoading = false);
@@ -147,13 +135,15 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
   void _showPermissionDialog(LocationPermissionState state) {
     String title = 'Location Permission Required';
     String message = 'Please grant device location access to transmit your real vehicle coordinates during the active trip.';
+    bool isPermanent = false;
 
     if (state == LocationPermissionState.serviceDisabled) {
       title = 'Device GPS Disabled';
       message = 'Please turn on GPS / Location Services in your phone quick settings.';
     } else if (state == LocationPermissionState.permanentlyDenied) {
       title = 'Permission Permanently Denied';
-      message = 'Location access is permanently blocked. Please open App Settings and allow location permissions.';
+      message = 'Location access is permanently blocked. Please open App Settings and allow location permissions for CampusRide.';
+      isPermanent = true;
     }
 
     showDialog(
@@ -174,14 +164,24 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel', style: TextStyle(color: AppColors.textMuted)),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _gpsService.checkAndRequestPermission();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Try Again'),
-          ),
+          if (isPermanent)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentBlue),
+              child: const Text('Open App Settings'),
+            )
+          else
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _gpsService.checkAndRequestPermission();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              child: const Text('Try Again'),
+            ),
         ],
       ),
     );
@@ -211,6 +211,50 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
             ),
           ],
         ),
+        actions: [
+          ValueListenableBuilder<int>(
+            valueListenable: NotificationService.instance.unreadCountNotifier,
+            builder: (context, unreadCount, _) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'Notifications',
+                    onPressed: () {
+                      context.push('/driver/notifications').then((_) {
+                        NotificationService.instance.fetchUnreadCount();
+                      });
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -448,6 +492,124 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
                         ],
                       ),
                     ),
+
+                    // Live Background GPS Telemetry Status Card
+                    ValueListenableBuilder<GpsTrackingStatus>(
+                      valueListenable: _gpsService.statusNotifier,
+                      builder: (context, gpsStatus, _) {
+                        if (!gpsStatus.isTracking && !isInProgress) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final isTransmitting = gpsStatus.isTracking;
+                        final lastLat = gpsStatus.lastLatitude != null ? gpsStatus.lastLatitude!.toStringAsFixed(5) : '--';
+                        final lastLng = gpsStatus.lastLongitude != null ? gpsStatus.lastLongitude!.toStringAsFixed(5) : '--';
+                        final speed = gpsStatus.speedKmh != null ? gpsStatus.speedKmh!.toStringAsFixed(1) : '0.0';
+                        final quality = gpsStatus.gpsQuality;
+                        final transmissions = gpsStatus.totalTransmissions;
+                        final queued = gpsStatus.queuedOfflineUpdates;
+
+                        return Container(
+                          margin: const EdgeInsets.only(top: 14),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceCard,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isTransmitting
+                                  ? AppColors.primary.withOpacity(0.5)
+                                  : AppColors.accentRose.withOpacity(0.4),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          color: isTransmitting ? AppColors.primaryLight : AppColors.accentRose,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isTransmitting ? 'Real-time GPS Active' : 'GPS Tracking Suspended',
+                                        style: TextStyle(
+                                          color: isTransmitting ? AppColors.primaryLight : AppColors.accentRose,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: isTransmitting
+                                          ? AppColors.primary.withOpacity(0.15)
+                                          : AppColors.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'GPS: $quality',
+                                      style: TextStyle(
+                                        color: isTransmitting ? AppColors.primaryLight : AppColors.textMuted,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildGpsStatItem('Vehicle Speed', '$speed km/h'),
+                                  _buildGpsStatItem('Transmissions', '$transmissions sent'),
+                                  _buildGpsStatItem('Offline Buffer', queued > 0 ? '$queued queued' : 'Synced'),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.my_location_rounded, size: 14, color: AppColors.textSecondary),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Coords: ($lastLat, $lastLng) • Foreground Service active',
+                                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (gpsStatus.errorMessage != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Status Notice: ${gpsStatus.errorMessage}',
+                                  style: const TextStyle(color: AppColors.accentRose, fontSize: 10),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 20),
 
                     // Quick Operational Actions
@@ -533,12 +695,7 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
                             onTap: () {
                               final activeTrip = _dashboardData?['activeTrip'];
                               if (activeTrip == null || activeTrip['id'] == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('No active or scheduled trip to report delay for.'),
-                                    backgroundColor: AppColors.accentAmber,
-                                  ),
-                                );
+                                AppFeedback.showWarning(context, 'No active or scheduled trip to report delay for.');
                                 return;
                               }
                               _showReportDelayDialog(activeTrip['id']);
@@ -646,23 +803,13 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
                         });
                         if (res.data['success'] == true && mounted) {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Delay of +$delayMinutes mins reported. Passengers notified.'),
-                              backgroundColor: AppColors.primary,
-                            ),
-                          );
+                          AppFeedback.showSuccess(context, 'Delay of +$delayMinutes mins reported. Passengers notified.');
                           _fetchDashboard();
                         }
                       } catch (e) {
                         setDialogState(() => isSubmitting = false);
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(ApiClient.getErrorMessage(e)),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
+                          AppFeedback.showError(context, e);
                         }
                       }
                     },
@@ -704,6 +851,25 @@ class _DriverDashboardScreenState extends ConsumerState<DriverDashboardScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildGpsStatItem(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            fontFamily: 'monospace',
+          ),
+        ),
+      ],
     );
   }
 }

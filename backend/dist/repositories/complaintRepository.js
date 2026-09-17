@@ -41,7 +41,7 @@ class ComplaintRepository {
     static async updateStatus(id, status, resolutionNotes, resolvedBy) {
         const updates = {
             status,
-            resolution_notes: resolutionNotes,
+            admin_response: resolutionNotes,
             resolved_by: resolvedBy,
             updated_at: new Date().toISOString(),
         };

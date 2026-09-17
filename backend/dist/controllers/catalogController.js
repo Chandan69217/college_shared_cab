@@ -7,6 +7,7 @@ const collegeRepository_1 = require("../repositories/collegeRepository");
 const pickupPointRepository_1 = require("../repositories/pickupPointRepository");
 const routeRepository_1 = require("../repositories/routeRepository");
 const vehicleRepository_1 = require("../repositories/vehicleRepository");
+const userRepository_1 = require("../repositories/userRepository");
 const supabaseClient_1 = require("../database/supabaseClient");
 class CatalogController {
     // COLLEGES
@@ -193,7 +194,19 @@ class CatalogController {
     // ROUTES
     static async getRoutes(req, res, next) {
         try {
-            const collegeId = req.query.college_id;
+            let collegeId = (req.query.college_id || req.query.collegeId);
+            if (!collegeId && req.user) {
+                if (req.user.role === 'STUDENT') {
+                    const profile = await userRepository_1.UserRepository.getStudentProfile(req.user.userId);
+                    if (profile?.college_id)
+                        collegeId = profile.college_id;
+                }
+                else if (req.user.role === 'DRIVER') {
+                    const profile = await userRepository_1.UserRepository.getDriverProfile(req.user.userId);
+                    if (profile?.college_id)
+                        collegeId = profile.college_id;
+                }
+            }
             const routes = await routeRepository_1.RouteRepository.findAll(collegeId);
             (0, response_1.sendSuccess)(res, 'Routes retrieved.', routes);
         }

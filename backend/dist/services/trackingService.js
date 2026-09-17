@@ -236,8 +236,8 @@ class TrackingService {
     static async getStudentLiveTracking(studentId) {
         const today = new Date().toISOString().split('T')[0];
         const bookings = await bookingRepository_1.BookingRepository.findByStudentId(studentId);
-        // Find confirmed booking for today
-        const activeBooking = bookings.find((b) => b.booking_date === today && b.status === 'CONFIRMED');
+        // Find confirmed booking for today or for an active in-progress trip
+        const activeBooking = bookings.find((b) => (b.booking_date === today || b.trip?.status === 'IN_PROGRESS') && b.status === 'CONFIRMED');
         if (!activeBooking || !activeBooking.trip_id) {
             return {
                 hasActiveTrip: false,

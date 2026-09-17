@@ -2,9 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StudentService = void 0;
 const notificationProvider_1 = require("../integrations/notificationProvider");
+const notificationService_1 = require("./notificationService");
 const userRepository_1 = require("../repositories/userRepository");
 const subscriptionRepository_1 = require("../repositories/subscriptionRepository");
 const bookingRepository_1 = require("../repositories/bookingRepository");
+const settingsRepository_1 = require("../repositories/settingsRepository");
 class StudentService {
     /**
      * Submit or update student verification documents in Supabase
@@ -18,7 +20,16 @@ class StudentService {
             id_card_url: data.id_card_url,
             verification_status: 'PENDING',
         });
-        await notificationProvider_1.NotificationProvider.send(studentId, 'Verification Under Review', 'Your student ID documents have been submitted and are pending administrative verification.', 'GENERAL');
+        await notificationService_1.NotificationService.createNotification({
+            userId: studentId,
+            recipientRole: 'STUDENT',
+            title: 'Verification Under Review',
+            message: 'Your student ID documents have been submitted and are pending administrative verification.',
+            type: 'KYC_SUBMITTED',
+            entityType: 'KYC',
+            entityId: studentId,
+            priority: 'NORMAL',
+        });
         return profile;
     }
     /**
@@ -36,6 +47,7 @@ class StudentService {
         if (todaysBooking) {
             todaysPass = await bookingRepository_1.BookingRepository.findDailyPass(todaysBooking.id);
         }
+        const unreadNotificationsCount = await notificationService_1.NotificationService.getUnreadCount(studentId);
         return {
             user: {
                 id: user?.id,
@@ -48,7 +60,7 @@ class StudentService {
             activeSubscription,
             todaysBooking,
             todaysPass,
-            unreadNotificationsCount: 0,
+            unreadNotificationsCount,
         };
     }
     /**
@@ -57,7 +69,10 @@ class StudentService {
     static async triggerSosAlert(studentId, location) {
         const user = await userRepository_1.UserRepository.findById(studentId);
         await notificationProvider_1.NotificationProvider.send(studentId, 'SOS Alert Dispatched', 'Emergency SOS signal sent to campus security and emergency contacts.', 'EMERGENCY');
-        await notificationProvider_1.NotificationProvider.broadcastToRole('ALL', 'EMERGENCY SOS ALERT', `Student ${user?.full_name || 'Unknown'} (${user?.phone || 'N/A'}) triggered an SOS emergency alert.`, 'EMERGENCY');
+        const broadcastEnabled = await settingsRepository_1.SettingsRepository.get('emergencySosBroadcast', true);
+        if (broadcastEnabled) {
+            await notificationProvider_1.NotificationProvider.broadcastToRole('ALL', 'EMERGENCY SOS ALERT', `Student ${user?.full_name || 'Unknown'} (${user?.phone || 'N/A'}) triggered an SOS emergency alert.`, 'EMERGENCY');
+        }
         return {
             success: true,
             timestamp: new Date().toISOString(),

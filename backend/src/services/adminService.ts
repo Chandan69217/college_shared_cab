@@ -1,5 +1,6 @@
 import { VerificationStatus, UserStatus, DriverStatus, VehicleStatus } from '../types';
 import { NotificationProvider } from '../integrations/notificationProvider';
+import { NotificationService } from './notificationService';
 import { hashPassword } from '../utils/crypto';
 import { UserRepository } from '../repositories/userRepository';
 import { ReportRepository } from '../repositories/reportRepository';
@@ -33,14 +34,23 @@ export class AdminService {
       verified_by: adminId,
     });
 
-    await NotificationProvider.send(
-      studentId,
-      status === 'VERIFIED' ? 'Student Verification Approved!' : 'Verification Status Update',
-      status === 'VERIFIED'
-        ? 'Your student profile has been verified. You can now book daily cabs.'
-        : `Your verification status has been updated to ${status}. Notes: ${notes || 'None'}`,
-      'GENERAL'
-    );
+    try {
+      await NotificationService.createNotification({
+        userId: studentId,
+        recipientRole: 'STUDENT',
+        title: status === 'VERIFIED' ? 'Student Verification Approved!' : 'Verification Status Update',
+        message: status === 'VERIFIED'
+          ? 'Your student profile has been verified. You can now book daily cabs.'
+          : `Your verification status has been updated to ${status}. Notes: ${notes || 'None'}`,
+        type: status === 'VERIFIED' ? 'ACCOUNT_VERIFIED' : 'ACCOUNT_REJECTED',
+        entityType: 'KYC',
+        entityId: studentId,
+        priority: status === 'VERIFIED' ? 'HIGH' : 'NORMAL',
+        data: { status, notes },
+      });
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
 
     return profile;
   }

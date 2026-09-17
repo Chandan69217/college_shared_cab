@@ -1,6 +1,7 @@
 import { Complaint, ComplaintCategory, ComplaintPriority, ComplaintStatus } from '../types';
 import { generateTicketNumber } from '../utils/crypto';
 import { NotificationProvider } from '../integrations/notificationProvider';
+import { NotificationService } from './notificationService';
 import { ComplaintRepository } from '../repositories/complaintRepository';
 
 export class ComplaintService {
@@ -28,13 +29,21 @@ export class ComplaintService {
       status: 'OPEN',
     });
 
-    await NotificationProvider.send(
-      studentId,
-      'Support Ticket Created',
-      `Ticket #${ticketNumber} has been logged under ${data.category}. We will respond within 24 hours.`,
-      'GENERAL',
-      { ticketNumber, complaintId: complaint.id }
-    );
+    try {
+      await NotificationService.createNotification({
+        userId: studentId,
+        recipientRole: 'STUDENT',
+        title: 'Support Ticket Created',
+        message: `Ticket #${ticketNumber} has been logged under ${data.category}. We will respond within 24 hours.`,
+        type: 'COMPLAINT_CREATED',
+        entityType: 'COMPLAINT',
+        entityId: complaint.id,
+        priority: 'NORMAL',
+        data: { ticketNumber, complaintId: complaint.id },
+      });
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
 
     return complaint;
   }
@@ -50,13 +59,21 @@ export class ComplaintService {
   ): Promise<Complaint> {
     const complaint = await ComplaintRepository.updateStatus(complaintId, status, response, adminId);
 
-    await NotificationProvider.send(
-      complaint.student_id,
-      `Support Ticket #${complaint.ticket_number} Updated`,
-      `Admin Response: ${response}`,
-      'GENERAL',
-      { complaintId }
-    );
+    try {
+      await NotificationService.createNotification({
+        userId: complaint.student_id,
+        recipientRole: 'STUDENT',
+        title: `Support Ticket #${complaint.ticket_number} Updated`,
+        message: `Status: ${status}. Admin response: ${response}`,
+        type: status === 'RESOLVED' ? 'COMPLAINT_RESOLVED' : 'SYSTEM_ANNOUNCEMENT',
+        entityType: 'COMPLAINT',
+        entityId: complaintId,
+        priority: 'NORMAL',
+        data: { complaintId, ticketNumber: complaint.ticket_number, status },
+      });
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
 
     return complaint;
   }

@@ -44,6 +44,18 @@ class StorageService {
     return _prefs?.getString(AppConstants.customApiUrlKey);
   }
 
+  static String? getString(String key) {
+    return _prefs?.getString(key);
+  }
+
+  static Future<void> setString(String key, String value) async {
+    await _prefs?.setString(key, value);
+  }
+
+  static Future<void> remove(String key) async {
+    await _prefs?.remove(key);
+  }
+
   static Future<void> clearAll() async {
     await _prefs?.remove(AppConstants.tokenKey);
     await _prefs?.remove(AppConstants.userKey);

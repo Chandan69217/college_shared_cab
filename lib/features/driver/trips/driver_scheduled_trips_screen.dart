@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/services/gps_tracking_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 import 'driver_trip_detail_sheet.dart';
 
 class DriverScheduledTripsScreen extends StatefulWidget {
@@ -105,31 +107,19 @@ class _DriverScheduledTripsScreenState extends State<DriverScheduledTripsScreen>
     try {
       final res = await apiClient.post('/trips/${trip.id}/start');
       if (res.data['success'] == true) {
-        await _gpsService.startTracking(trip.id);
+        await _gpsService.startTracking(
+          trip.id,
+          routeName: trip.route?.name,
+          vehiclePlate: trip.vehicle?['vehicle_number'],
+        );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.gps_fixed_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('Trip Started! Live GPS location sharing is active.')),
-                ],
-              ),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Trip Started! Live GPS location sharing is active.');
           _fetchAllTrips();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _actionTripId = null);
@@ -143,29 +133,13 @@ class _DriverScheduledTripsScreenState extends State<DriverScheduledTripsScreen>
       if (res.data['success'] == true) {
         await _gpsService.stopTracking();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(child: Text('Trip Completed! GPS tracking stopped.')),
-                ],
-              ),
-              backgroundColor: AppColors.primary,
-            ),
-          );
+          AppFeedback.showSuccess(context, 'Trip Completed! GPS tracking stopped.');
           _fetchAllTrips();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _actionTripId = null);
@@ -173,9 +147,17 @@ class _DriverScheduledTripsScreenState extends State<DriverScheduledTripsScreen>
   }
 
   void _showPermissionAlert(LocationPermissionState state) {
-    String message = 'Please grant device location access to transmit live vehicle coordinates during active trips.';
-    if (state == LocationPermissionState.permanentlyDenied) {
-      message = 'Location access is permanently disabled. Please allow location permissions in device settings.';
+    String title = 'Location Permission Required';
+    String message = 'Please grant device location access to transmit your real vehicle coordinates during the active trip.';
+    bool isPermanent = false;
+
+    if (state == LocationPermissionState.serviceDisabled) {
+      title = 'Device GPS Disabled';
+      message = 'Please turn on GPS / Location Services in your device quick settings.';
+    } else if (state == LocationPermissionState.permanentlyDenied) {
+      title = 'Permission Permanently Denied';
+      message = 'Location access is permanently blocked. Please open App Settings and allow location permissions for CampusRide.';
+      isPermanent = true;
     }
 
     showDialog(
@@ -183,13 +165,28 @@ class _DriverScheduledTripsScreenState extends State<DriverScheduledTripsScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Location Access Required', style: TextStyle(color: Colors.white, fontSize: 16)),
+        title: Row(
+          children: [
+            const Icon(Icons.location_off_rounded, color: AppColors.accentRose, size: 22),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
         content: Text(message, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Dismiss', style: TextStyle(color: AppColors.textMuted)),
           ),
+          if (isPermanent)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentBlue),
+              child: const Text('Open Settings'),
+            ),
         ],
       ),
     );

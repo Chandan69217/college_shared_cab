@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/storage/storage_service.dart';
+import 'core/services/settings_service.dart';
+import 'core/utils/app_feedback.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/student_register_screen.dart';
 import 'features/auth/presentation/forgot_password_screen.dart';
@@ -11,11 +13,14 @@ import 'features/student/student_main_shell.dart';
 import 'features/student/plans/plans_checkout_screen.dart';
 import 'features/student/history/ride_history_screen.dart';
 import 'features/student/support/support_screen.dart';
+import 'features/notifications/presentation/notifications_screen.dart';
 import 'features/driver/driver_main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
+  SettingsService.instance.initializeFromCache();
+  SettingsService.instance.fetchSettings();
   runApp(const ProviderScope(child: CampusRideApp()));
 }
 
@@ -77,6 +82,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
         path: '/student',
         builder: (context, state) => const StudentMainShell(),
         routes: [
@@ -92,11 +101,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'support',
             builder: (context, state) => const SupportScreen(),
           ),
+          GoRoute(
+            path: 'notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
         ],
       ),
       GoRoute(
         path: '/driver',
         builder: (context, state) => const DriverMainShell(),
+        routes: [
+          GoRoute(
+            path: 'notifications',
+            builder: (context, state) => const NotificationsScreen(),
+          ),
+        ],
       ),
     ],
   );
@@ -114,6 +133,7 @@ class CampusRideApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       routerConfig: router,
+      scaffoldMessengerKey: AppFeedback.rootScaffoldMessengerKey,
     );
   }
 }

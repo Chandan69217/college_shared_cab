@@ -20,11 +20,13 @@ import {
 } from 'lucide-react';
 import { api, getApiErrorMessage } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/Modal';
 
 export const ProfilePage: React.FC = () => {
   const { user: authUser, logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState<any>(null);
@@ -79,7 +81,9 @@ export const ProfilePage: React.FC = () => {
         });
       }
     } catch (err: any) {
-      setError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setError(msg);
+      toast.showError(msg);
     } finally {
       setLoading(false);
     }
@@ -99,11 +103,15 @@ export const ProfilePage: React.FC = () => {
       if (res.data?.success) {
         setProfileData(res.data.data);
         setIsEditModalOpen(false);
-        setSuccessMessage('Your profile information has been updated successfully.');
+        const successText = 'Your profile information has been updated successfully.';
+        setSuccessMessage(successText);
+        toast.showSuccess(successText);
         setTimeout(() => setSuccessMessage(''), 4000);
       }
     } catch (err: any) {
-      setEditError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setEditError(msg);
+      toast.showError(msg);
     } finally {
       setEditLoading(false);
     }
@@ -115,11 +123,15 @@ export const ProfilePage: React.FC = () => {
     setPasswordSuccess('');
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError('New password and confirm password do not match.');
+      const errText = 'New password and confirm password do not match.';
+      setPasswordError(errText);
+      toast.showError(errText);
       return;
     }
     if (passwordData.newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters long.');
+      const errText = 'New password must be at least 8 characters long.';
+      setPasswordError(errText);
+      toast.showError(errText);
       return;
     }
 
@@ -127,12 +139,16 @@ export const ProfilePage: React.FC = () => {
     try {
       const res = await api.post('/auth/change-password', passwordData);
       if (res.data?.success) {
-        setPasswordSuccess('Password changed successfully.');
+        const successText = 'Password changed successfully.';
+        setPasswordSuccess(successText);
+        toast.showSuccess(successText);
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setTimeout(() => setPasswordSuccess(''), 4000);
       }
     } catch (err: any) {
-      setPasswordError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setPasswordError(msg);
+      toast.showError(msg);
     } finally {
       setPasswordLoading(false);
     }
@@ -140,7 +156,9 @@ export const ProfilePage: React.FC = () => {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE PERMANENTLY') {
-      setDeleteError('Please type "DELETE PERMANENTLY" exactly to confirm.');
+      const errText = 'Please type "DELETE PERMANENTLY" exactly to confirm.';
+      setDeleteError(errText);
+      toast.showError(errText);
       return;
     }
 
@@ -149,11 +167,14 @@ export const ProfilePage: React.FC = () => {
     try {
       const res = await api.delete('/profile');
       if (res.data?.success) {
+        toast.showSuccess('Administrator account deleted successfully.');
         logout();
         navigate('/login');
       }
     } catch (err: any) {
-      setDeleteError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setDeleteError(msg);
+      toast.showError(msg);
     } finally {
       setDeleteLoading(false);
     }

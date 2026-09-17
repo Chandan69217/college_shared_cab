@@ -13,6 +13,7 @@
 /backend/node_modules/
 /admin-web/node_modules/
 migrate_working_dir/
+/scratch/
 backend/.env
 
 # IntelliJ related

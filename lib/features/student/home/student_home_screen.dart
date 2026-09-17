@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/services/settings_service.dart';
 import '../../auth/providers/auth_provider.dart';
+
+import '../../../core/services/notification_service.dart';
 
 class StudentHomeScreen extends ConsumerStatefulWidget {
   final Function(int)? onNavigateTab;
@@ -33,6 +36,8 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen>
           _isLoading = false;
         });
       }
+      // Also refresh live unread notification count
+      NotificationService.instance.fetchUnreadCount();
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -42,6 +47,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen>
   void initState() {
     super.initState();
     _fetchDashboard(isInitial: true);
+    NotificationService.instance.fetchUnreadCount();
   }
 
   @override
@@ -71,14 +77,48 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen>
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No new notifications.')),
+          ValueListenableBuilder<int>(
+            valueListenable: NotificationService.instance.unreadCountNotifier,
+            builder: (context, unreadCount, _) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    tooltip: 'Notifications',
+                    onPressed: () {
+                      context.push('/student/notifications').then((_) {
+                        NotificationService.instance.fetchUnreadCount();
+                      });
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          unreadCount > 99 ? '99+' : '$unreadCount',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
@@ -94,8 +134,53 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // System Maintenance Alert Banner
+                    if (SettingsService.instance.maintenanceMode) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentRose.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.accentRose.withOpacity(0.4),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.construction_rounded,
+                                color: AppColors.accentRose, size: 24),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Platform Maintenance in Progress',
+                                    style: TextStyle(
+                                      color: AppColors.accentRose,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Shared cab bookings are temporarily suspended by campus transport administration.',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
                     // KYC Verification Alert Banner if Pending
-                    if (kycStatus == 'PENDING') ...[
+                    if (SettingsService.instance.requireAdminKycApproval && kycStatus == 'PENDING') ...[
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -109,7 +194,7 @@ class _StudentHomeScreenState extends ConsumerState<StudentHomeScreen>
                           children: [
                             const Icon(Icons.pending_actions_rounded,
                                 color: AppColors.accentAmber, size: 24),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,

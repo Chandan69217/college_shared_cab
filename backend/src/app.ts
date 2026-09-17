@@ -97,11 +97,15 @@ export function createApp(): Express {
 
   // 404 Handler for undefined routes
   app.use((req: Request, res: Response) => {
+    const notFoundMessage = `Route not found: ${req.method} ${req.originalUrl}`;
     res.status(404).json({
       success: false,
-      message: `Route not found: ${req.method} ${req.originalUrl}`,
+      message: notFoundMessage,
       data: null,
-      error: { code: 'ROUTE_NOT_FOUND' },
+      error: {
+        code: 'ROUTE_NOT_FOUND',
+        message: notFoundMessage,
+      },
     });
   });
 

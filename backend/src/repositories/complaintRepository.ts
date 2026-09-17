@@ -48,7 +48,7 @@ export class ComplaintRepository {
   ): Promise<Complaint> {
     const updates: any = {
       status,
-      resolution_notes: resolutionNotes,
+      admin_response: resolutionNotes,
       resolved_by: resolvedBy,
       updated_at: new Date().toISOString(),
     };

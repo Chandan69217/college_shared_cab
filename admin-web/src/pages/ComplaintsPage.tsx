@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { MessageSquare, CheckCircle, Clock, AlertTriangle, Send } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { Complaint } from '../types';
 
 export const ComplaintsPage: React.FC = () => {
+  const toast = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [adminResponse, setAdminResponse] = useState('');
@@ -19,7 +21,7 @@ export const ComplaintsPage: React.FC = () => {
         setComplaints(res.data.data);
       }
     } catch (err) {
-      console.error(err);
+      toast.error(err);
     }
   };
 
@@ -36,11 +38,12 @@ export const ComplaintsPage: React.FC = () => {
         admin_response: adminResponse,
         status,
       });
+      toast.success(`Ticket #${selectedComplaint.ticket_number} resolution saved and sent to user.`);
       setSelectedComplaint(null);
       setAdminResponse('');
       fetchComplaints();
     } catch (err) {
-      console.error(err);
+      toast.error(err);
     } finally {
       setSubmitting(false);
     }

@@ -15,9 +15,11 @@ import {
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { Trip, Route, Vehicle, User } from '../types';
 
 export const TripsPage: React.FC = () => {
+  const toast = useToast();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [activeLocations, setActiveLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +115,9 @@ export const TripsPage: React.FC = () => {
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.route_id || !formData.vehicle_id || !formData.driver_id) {
-      setModalError('Please select a route, vehicle, and operating driver.');
+      const errText = 'Please select a route, vehicle, and operating driver.';
+      setModalError(errText);
+      toast.showError(errText);
       return;
     }
 
@@ -122,13 +126,17 @@ export const TripsPage: React.FC = () => {
     try {
       const res = await api.post('/trips', formData);
       if (res.data.success) {
-        setSuccessMessage('Trip scheduled successfully! Driver schedule updated.');
+        const successText = 'Trip scheduled successfully! Driver schedule updated.';
+        setSuccessMessage(successText);
+        toast.showSuccess(successText);
         setScheduleModalOpen(false);
         fetchTrips();
         setTimeout(() => setSuccessMessage(''), 4000);
       }
-    } catch (err) {
-      setModalError(getApiErrorMessage(err));
+    } catch (err: any) {
+      const msg = getApiErrorMessage(err);
+      setModalError(msg);
+      toast.showError(msg);
     } finally {
       setModalLoading(false);
     }

@@ -49,6 +49,22 @@ export class TripRepository {
     const { data: routes, error: routeErr } = await routeQuery;
     if (routeErr || !routes || routes.length === 0) return;
 
+    // 1. Fetch all existing trips for that date in ONE query
+    const { data: existingTrips } = await client
+      .from('trips')
+      .select('id, route_id, trip_type, status, scheduled_departure_time, driver_id, vehicle_id, max_capacity')
+      .eq('trip_date', todayIST);
+
+    const tripMap = new Map<string, any>();
+    if (existingTrips) {
+      for (const t of existingTrips) {
+        tripMap.set(`${t.route_id}_${t.trip_type}`, t);
+      }
+    }
+
+    const newTripsToInsert: any[] = [];
+    const updatePromises: PromiseLike<any>[] = [];
+
     for (const route of routes) {
       const vehicleCap = route.default_vehicle?.seating_capacity || route.max_capacity || 6;
       const driverIdToUse = route.default_driver_id || null;
@@ -56,16 +72,10 @@ export class TripRepository {
 
       // 1. MORNING_PICKUP Trip
       if (route.morning_departure_time) {
-        const { data: existingMorning } = await client
-          .from('trips')
-          .select('id, status, scheduled_departure_time, driver_id, vehicle_id, max_capacity')
-          .eq('route_id', route.id)
-          .eq('trip_date', todayIST)
-          .eq('trip_type', 'MORNING_PICKUP')
-          .maybeSingle();
+        const existingMorning = tripMap.get(`${route.id}_MORNING_PICKUP`);
 
         if (!existingMorning) {
-          await client.from('trips').insert([{
+          newTripsToInsert.push({
             route_id: route.id,
             driver_id: driverIdToUse,
             vehicle_id: vehicleIdToUse,
@@ -76,7 +86,7 @@ export class TripRepository {
             max_capacity: vehicleCap,
             booked_seats: 0,
             boarded_passengers: 0,
-          }]);
+          });
         } else if (existingMorning.status === 'SCHEDULED') {
           const updates: any = {};
           if (existingMorning.scheduled_departure_time !== route.morning_departure_time) {
@@ -93,23 +103,17 @@ export class TripRepository {
           }
           if (Object.keys(updates).length > 0) {
             updates.updated_at = new Date().toISOString();
-            await client.from('trips').update(updates).eq('id', existingMorning.id);
+            updatePromises.push(client.from('trips').update(updates).eq('id', existingMorning.id));
           }
         }
       }
 
       // 2. EVENING_DROP Trip
       if (route.evening_departure_time) {
-        const { data: existingEvening } = await client
-          .from('trips')
-          .select('id, status, scheduled_departure_time, driver_id, vehicle_id, max_capacity')
-          .eq('route_id', route.id)
-          .eq('trip_date', todayIST)
-          .eq('trip_type', 'EVENING_DROP')
-          .maybeSingle();
+        const existingEvening = tripMap.get(`${route.id}_EVENING_DROP`);
 
         if (!existingEvening) {
-          await client.from('trips').insert([{
+          newTripsToInsert.push({
             route_id: route.id,
             driver_id: driverIdToUse,
             vehicle_id: vehicleIdToUse,
@@ -120,7 +124,7 @@ export class TripRepository {
             max_capacity: vehicleCap,
             booked_seats: 0,
             boarded_passengers: 0,
-          }]);
+          });
         } else if (existingEvening.status === 'SCHEDULED') {
           const updates: any = {};
           if (existingEvening.scheduled_departure_time !== route.evening_departure_time) {
@@ -137,10 +141,16 @@ export class TripRepository {
           }
           if (Object.keys(updates).length > 0) {
             updates.updated_at = new Date().toISOString();
-            await client.from('trips').update(updates).eq('id', existingEvening.id);
+            updatePromises.push(client.from('trips').update(updates).eq('id', existingEvening.id));
           }
         }
       }
+    }
+    if (newTripsToInsert.length > 0) {
+      await client.from('trips').insert(newTripsToInsert);
+    }
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
     }
   }
 

@@ -5,6 +5,7 @@ import { CollegeRepository } from '../repositories/collegeRepository';
 import { PickupPointRepository } from '../repositories/pickupPointRepository';
 import { RouteRepository } from '../repositories/routeRepository';
 import { VehicleRepository } from '../repositories/vehicleRepository';
+import { UserRepository } from '../repositories/userRepository';
 import { getSupabaseClient } from '../database/supabaseClient';
 
 export class CatalogController {
@@ -223,7 +224,16 @@ export class CatalogController {
   // ROUTES
   public static async getRoutes(req: Request, res: Response, next: NextFunction) {
     try {
-      const collegeId = req.query.college_id as string;
+      let collegeId = (req.query.college_id || req.query.collegeId) as string;
+      if (!collegeId && req.user) {
+        if (req.user.role === 'STUDENT') {
+          const profile = await UserRepository.getStudentProfile(req.user.userId);
+          if (profile?.college_id) collegeId = profile.college_id;
+        } else if (req.user.role === 'DRIVER') {
+          const profile = await UserRepository.getDriverProfile(req.user.userId);
+          if (profile?.college_id) collegeId = profile.college_id;
+        }
+      }
       const routes = await RouteRepository.findAll(collegeId);
       sendSuccess(res, 'Routes retrieved.', routes);
     } catch (err) {

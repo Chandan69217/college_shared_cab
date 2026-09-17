@@ -5,6 +5,8 @@ import { BookingRepository } from '../repositories/bookingRepository';
 import { TripRepository } from '../repositories/tripRepository';
 import { UserRepository } from '../repositories/userRepository';
 import { PickupPointRepository } from '../repositories/pickupPointRepository';
+import { SettingsRepository } from '../repositories/settingsRepository';
+import { NotificationService } from './notificationService';
 
 export interface QrVerificationResponse {
   authorized: boolean;
@@ -158,8 +160,9 @@ export class QrPassService {
       };
     }
 
-    // Anti-replay attack check
-    if (pass.status === 'USED') {
+    // Anti-replay attack check if enabled in settings
+    const replayProtection = await SettingsRepository.get('enableDynamicQrReplayProtection', true);
+    if (replayProtection && pass.status === 'USED') {
       await this.logScan(pass.id, tripId, pass.student_id, driverId, 'NOT_AUTHORIZED', 'ALREADY_USED', clientLat, clientLng);
       return {
         authorized: false,
@@ -201,6 +204,23 @@ export class QrPassService {
 
     // Record audit log
     await this.logScan(pass.id, tripId, pass.student_id, driverId, 'AUTHORIZED', undefined, clientLat, clientLng);
+
+    // Notify student of successful QR boarding verification
+    try {
+      await NotificationService.createNotification({
+        userId: pass.student_id,
+        recipientRole: 'STUDENT',
+        title: 'Boarding Confirmed',
+        message: 'Your dynamic QR travel pass was successfully verified by the driver. Have a safe journey!',
+        type: 'BOARDING_CONFIRMED',
+        entityType: 'PASS',
+        entityId: pass.id,
+        priority: 'NORMAL',
+        data: { passId: pass.id, tripId },
+      });
+    } catch (notifErr) {
+      // Non-blocking notification error
+    }
 
     const studentUser = await UserRepository.findById(pass.student_id);
     const studentProfile = await UserRepository.getStudentProfile(pass.student_id);

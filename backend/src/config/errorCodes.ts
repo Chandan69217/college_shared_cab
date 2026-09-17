@@ -1,0 +1,208 @@
+/**
+ * Standardized Centralized Error Codes for Campus Shared-Cab Platform
+ */
+export const ERROR_CODES = {
+  // Authentication & Authorization
+  AUTH_INVALID_CREDENTIALS: 'AUTH_INVALID_CREDENTIALS',
+  AUTH_USER_NOT_FOUND: 'AUTH_USER_NOT_FOUND',
+  AUTH_SESSION_EXPIRED: 'AUTH_SESSION_EXPIRED',
+  AUTH_UNAUTHORIZED: 'AUTH_UNAUTHORIZED',
+  AUTH_FORBIDDEN: 'AUTH_FORBIDDEN',
+  AUTH_ROLE_MISMATCH: 'AUTH_ROLE_MISMATCH',
+  AUTH_ACCOUNT_SUSPENDED: 'AUTH_ACCOUNT_SUSPENDED',
+  AUTH_ACCOUNT_DEACTIVATED: 'AUTH_ACCOUNT_DEACTIVATED',
+  AUTH_ACCOUNT_LOCKED: 'AUTH_ACCOUNT_LOCKED',
+  AUTH_RATE_LIMIT_EXCEEDED: 'AUTH_RATE_LIMIT_EXCEEDED',
+  OTP_INVALID: 'OTP_INVALID',
+  OTP_EXPIRED: 'OTP_EXPIRED',
+  OTP_RATE_LIMITED: 'OTP_RATE_LIMITED',
+
+  // Validation & Form Data
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  VALIDATION_REQUIRED_FIELD: 'VALIDATION_REQUIRED_FIELD',
+  VALIDATION_INVALID_DATA: 'VALIDATION_INVALID_DATA',
+  INVALID_ID_FORMAT: 'INVALID_ID_FORMAT',
+  DUPLICATE_RESOURCE: 'DUPLICATE_RESOURCE',
+
+  // Catalog & Operational Entities
+  COLLEGE_NOT_FOUND: 'COLLEGE_NOT_FOUND',
+  ROUTE_NOT_FOUND: 'ROUTE_NOT_FOUND',
+  PICKUP_POINT_NOT_FOUND: 'PICKUP_POINT_NOT_FOUND',
+  INVALID_PICKUP_STOP: 'INVALID_PICKUP_STOP',
+  INVALID_DROP_STOP: 'INVALID_DROP_STOP',
+  INVALID_STOP_SEQUENCE: 'INVALID_STOP_SEQUENCE',
+  PICKUP_STOP_ALREADY_PASSED: 'PICKUP_STOP_ALREADY_PASSED',
+  VEHICLE_NOT_FOUND: 'VEHICLE_NOT_FOUND',
+  DRIVER_NOT_FOUND: 'DRIVER_NOT_FOUND',
+  DRIVER_UNAVAILABLE: 'DRIVER_UNAVAILABLE',
+  UNAUTHORIZED_DRIVER: 'UNAUTHORIZED_DRIVER',
+  PROTECTED_RECORD_REFERENCE: 'PROTECTED_RECORD_REFERENCE',
+
+  // Booking & Cab Availability
+  NO_CAB_AVAILABLE: 'NO_CAB_AVAILABLE',
+  ALL_CABS_PASSED_STOP: 'ALL_CABS_PASSED_STOP',
+  ALL_CABS_FULL: 'ALL_CABS_FULL',
+  BOOKING_FULL: 'BOOKING_FULL',
+  BOOKING_NOT_FOUND: 'BOOKING_NOT_FOUND',
+  BOOKING_ALREADY_EXISTS: 'BOOKING_ALREADY_EXISTS',
+  BOOKING_CANCELLED: 'BOOKING_CANCELLED',
+  CANCELLATION_UNAVAILABLE: 'CANCELLATION_UNAVAILABLE',
+
+  // Trip Lifecycle
+  TRIP_NOT_FOUND: 'TRIP_NOT_FOUND',
+  TRIP_UNAVAILABLE: 'TRIP_UNAVAILABLE',
+  TRIP_NOT_ACTIVE: 'TRIP_NOT_ACTIVE',
+  TRIP_ALREADY_COMPLETED: 'TRIP_ALREADY_COMPLETED',
+  NO_TRIP_ASSIGNED: 'NO_TRIP_ASSIGNED',
+
+  // Pass & QR Validation
+  PASS_NOT_FOUND: 'PASS_NOT_FOUND',
+  PASS_INACTIVE: 'PASS_INACTIVE',
+  PASS_EXPIRED: 'PASS_EXPIRED',
+  QR_INVALID: 'QR_INVALID',
+  QR_EXPIRED: 'QR_EXPIRED',
+  QR_ALREADY_USED: 'QR_ALREADY_USED',
+  QR_WRONG_TRIP: 'QR_WRONG_TRIP',
+
+  // Student KYC & Verification
+  STUDENT_NOT_VERIFIED: 'STUDENT_NOT_VERIFIED',
+  KYC_REQUIRED: 'KYC_REQUIRED',
+  VERIFICATION_PENDING: 'VERIFICATION_PENDING',
+  VERIFICATION_REJECTED: 'VERIFICATION_REJECTED',
+
+  // Subscriptions & Plans
+  PLAN_NOT_FOUND: 'PLAN_NOT_FOUND',
+  PLAN_INACTIVE: 'PLAN_INACTIVE',
+  SUBSCRIPTION_REQUIRED: 'SUBSCRIPTION_REQUIRED',
+  NO_ACTIVE_SUBSCRIPTION: 'NO_ACTIVE_SUBSCRIPTION',
+  SUBSCRIPTION_EXPIRED: 'SUBSCRIPTION_EXPIRED',
+  NO_RIDES_REMAINING: 'NO_RIDES_REMAINING',
+
+  // Payments & Transactions
+  PAYMENT_NOT_FOUND: 'PAYMENT_NOT_FOUND',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+  PAYMENT_REQUIRED: 'PAYMENT_REQUIRED',
+  PAYMENT_NOT_VERIFIED: 'PAYMENT_NOT_VERIFIED',
+  PAYMENT_ALREADY_PROCESSED: 'PAYMENT_ALREADY_PROCESSED',
+  INVALID_PAYMENT_PAYLOAD: 'INVALID_PAYMENT_PAYLOAD',
+
+  // GPS & Live Tracking
+  GPS_PERMISSION_REQUIRED: 'GPS_PERMISSION_REQUIRED',
+  GPS_UNAVAILABLE: 'GPS_UNAVAILABLE',
+  INVALID_COORDINATES: 'INVALID_COORDINATES',
+  SUSPICIOUS_GPS_SPEED: 'SUSPICIOUS_GPS_SPEED',
+  SPOOFING_DETECTED: 'SPOOFING_DETECTED',
+  LOCATION_UPDATE_FAILED: 'LOCATION_UPDATE_FAILED',
+
+  // Notifications
+  NOTIFICATION_NOT_FOUND: 'NOTIFICATION_NOT_FOUND',
+  DEVICE_TOKEN_REQUIRED: 'DEVICE_TOKEN_REQUIRED',
+
+  // System & Platform
+  MAINTENANCE_MODE: 'MAINTENANCE_MODE',
+  DATABASE_UNAVAILABLE: 'DATABASE_UNAVAILABLE',
+  SERVER_ERROR: 'SERVER_ERROR',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export type ErrorCode = keyof typeof ERROR_CODES;
+
+export const USER_FRIENDLY_ERROR_MESSAGES: Record<string, string> = {
+  // Auth
+  [ERROR_CODES.AUTH_INVALID_CREDENTIALS]: 'Invalid email/phone or password. Please check your credentials and try again.',
+  [ERROR_CODES.AUTH_USER_NOT_FOUND]: 'Account not found. We couldn\'t find an account with the credentials provided.',
+  [ERROR_CODES.AUTH_SESSION_EXPIRED]: 'Your session has expired. Please sign in again to continue.',
+  [ERROR_CODES.AUTH_UNAUTHORIZED]: 'Authentication required. Please sign in to access this feature.',
+  [ERROR_CODES.AUTH_FORBIDDEN]: 'Access restricted. You do not have permission to perform this action.',
+  [ERROR_CODES.AUTH_ROLE_MISMATCH]: 'Access restricted. You are not authorized to use this application.',
+  [ERROR_CODES.AUTH_ACCOUNT_SUSPENDED]: 'Account suspended. Please contact campus administration for assistance.',
+  [ERROR_CODES.AUTH_ACCOUNT_DEACTIVATED]: 'Account deactivated. This account is no longer active.',
+  [ERROR_CODES.AUTH_ACCOUNT_LOCKED]: 'Account locked due to security policy. Please contact campus administration.',
+  [ERROR_CODES.AUTH_RATE_LIMIT_EXCEEDED]: 'Too many attempts. Please wait 15 minutes before trying again.',
+  [ERROR_CODES.OTP_INVALID]: 'Invalid OTP code. Please check the code and try again.',
+  [ERROR_CODES.OTP_EXPIRED]: 'OTP has expired. Please request a new verification code.',
+  [ERROR_CODES.OTP_RATE_LIMITED]: 'Too many verification attempts. Please wait a moment before requesting another code.',
+
+  // Validation
+  [ERROR_CODES.VALIDATION_ERROR]: 'Please verify the submitted details and ensure all required fields are filled.',
+  [ERROR_CODES.VALIDATION_REQUIRED_FIELD]: 'Please fill in all required fields.',
+  [ERROR_CODES.VALIDATION_INVALID_DATA]: 'The submitted data is invalid. Please review your input.',
+  [ERROR_CODES.INVALID_ID_FORMAT]: 'Invalid identifier format.',
+  [ERROR_CODES.DUPLICATE_RESOURCE]: 'A record with this information already exists in the system.',
+
+  // Operational & Catalog
+  [ERROR_CODES.COLLEGE_NOT_FOUND]: 'The specified college institution was not found.',
+  [ERROR_CODES.ROUTE_NOT_FOUND]: 'Selected shuttle route could not be found.',
+  [ERROR_CODES.PICKUP_POINT_NOT_FOUND]: 'Selected pickup point is invalid or not available.',
+  [ERROR_CODES.INVALID_PICKUP_STOP]: 'This pickup point does not belong to the selected route.',
+  [ERROR_CODES.INVALID_DROP_STOP]: 'This drop point is not valid for the selected route.',
+  [ERROR_CODES.INVALID_STOP_SEQUENCE]: 'Drop point must be located after the pickup point along the route.',
+  [ERROR_CODES.PICKUP_STOP_ALREADY_PASSED]: 'All available cabs have already passed this pickup point. Please select another available pickup point.',
+  [ERROR_CODES.VEHICLE_NOT_FOUND]: 'The specified vehicle record was not found.',
+  [ERROR_CODES.DRIVER_NOT_FOUND]: 'The specified driver record was not found.',
+  [ERROR_CODES.DRIVER_UNAVAILABLE]: 'No driver is currently available for this trip.',
+  [ERROR_CODES.UNAUTHORIZED_DRIVER]: 'You are not authorized as the assigned driver for this trip.',
+  [ERROR_CODES.PROTECTED_RECORD_REFERENCE]: 'This record cannot be permanently deleted because active operational records (such as trips, bookings, or historical records) are linked to it. You can deactivate it instead.',
+
+  // Booking
+  [ERROR_CODES.NO_CAB_AVAILABLE]: 'No eligible cab is currently available for your selected route and pickup point.',
+  [ERROR_CODES.ALL_CABS_PASSED_STOP]: 'All available cabs have already passed this pickup point. Please try another pickup point or try again later.',
+  [ERROR_CODES.ALL_CABS_FULL]: 'The selected cab is full. All cabs on this route have reached maximum capacity.',
+  [ERROR_CODES.BOOKING_FULL]: 'Sorry, this trip is now fully booked.',
+  [ERROR_CODES.BOOKING_NOT_FOUND]: 'Booking record not found.',
+  [ERROR_CODES.BOOKING_ALREADY_EXISTS]: 'You already have a confirmed booking for this trip.',
+  [ERROR_CODES.BOOKING_CANCELLED]: 'This booking has been cancelled.',
+  [ERROR_CODES.CANCELLATION_UNAVAILABLE]: 'This booking can no longer be cancelled according to the cancellation policy.',
+
+  // Trips
+  [ERROR_CODES.TRIP_NOT_FOUND]: 'Scheduled trip record not found.',
+  [ERROR_CODES.TRIP_UNAVAILABLE]: 'This trip is not currently open for bookings.',
+  [ERROR_CODES.TRIP_NOT_ACTIVE]: 'GPS updates are only active during trips that are currently in progress.',
+  [ERROR_CODES.TRIP_ALREADY_COMPLETED]: 'This trip has already concluded.',
+  [ERROR_CODES.NO_TRIP_ASSIGNED]: 'You do not have a trip assigned for this time.',
+
+  // Pass & QR
+  [ERROR_CODES.PASS_NOT_FOUND]: 'Daily travel pass not found.',
+  [ERROR_CODES.PASS_INACTIVE]: 'This pass is no longer active for travel.',
+  [ERROR_CODES.PASS_EXPIRED]: 'This travel pass has expired. Please refresh your pass.',
+  [ERROR_CODES.QR_INVALID]: 'Invalid or counterfeit QR code signature.',
+  [ERROR_CODES.QR_EXPIRED]: 'QR code expired. Student must refresh their daily pass.',
+  [ERROR_CODES.QR_ALREADY_USED]: 'REPLAY DETECTED: This pass has already been used for boarding.',
+  [ERROR_CODES.QR_WRONG_TRIP]: 'This pass is for a different scheduled trip.',
+
+  // KYC
+  [ERROR_CODES.STUDENT_NOT_VERIFIED]: 'Student account is pending administrative verification. Booking is disabled.',
+  [ERROR_CODES.KYC_REQUIRED]: 'Student KYC is pending administrative approval. Subscription purchase is only allowed once your ID documents are verified.',
+  [ERROR_CODES.VERIFICATION_PENDING]: 'Your student verification is currently under review by campus administrators.',
+  [ERROR_CODES.VERIFICATION_REJECTED]: 'Your student verification was not approved. Please update your ID documents.',
+
+  // Subscriptions
+  [ERROR_CODES.PLAN_NOT_FOUND]: 'Subscription plan not found.',
+  [ERROR_CODES.PLAN_INACTIVE]: 'This subscription plan is not currently available.',
+  [ERROR_CODES.SUBSCRIPTION_REQUIRED]: 'Active subscription required. Please purchase a plan before booking a ride.',
+  [ERROR_CODES.NO_ACTIVE_SUBSCRIPTION]: 'No active subscription with available ride credits found. Please purchase a plan.',
+  [ERROR_CODES.SUBSCRIPTION_EXPIRED]: 'Your subscription has expired. Please renew your plan.',
+  [ERROR_CODES.NO_RIDES_REMAINING]: 'You have used all ride credits in your subscription plan. Please renew to continue.',
+
+  // Payments
+  [ERROR_CODES.PAYMENT_NOT_FOUND]: 'Payment record not found.',
+  [ERROR_CODES.PAYMENT_FAILED]: 'Payment transaction could not be completed. Please try again.',
+  [ERROR_CODES.PAYMENT_REQUIRED]: 'Payment is required to activate your transportation plan.',
+  [ERROR_CODES.PAYMENT_NOT_VERIFIED]: 'Payment verification failed. Please check your transaction details.',
+  [ERROR_CODES.PAYMENT_ALREADY_PROCESSED]: 'This payment transaction has already been processed.',
+  [ERROR_CODES.INVALID_PAYMENT_PAYLOAD]: 'Payment transaction information is invalid or incomplete.',
+
+  // GPS
+  [ERROR_CODES.GPS_PERMISSION_REQUIRED]: 'Location permission is required to start live trip tracking.',
+  [ERROR_CODES.GPS_UNAVAILABLE]: 'GPS location service is unavailable on your device.',
+  [ERROR_CODES.INVALID_COORDINATES]: 'Invalid GPS coordinates received.',
+  [ERROR_CODES.SUSPICIOUS_GPS_SPEED]: 'GPS update rejected: speed exceeds realistic vehicle limits.',
+  [ERROR_CODES.SPOOFING_DETECTED]: 'GPS update rejected: impossible coordinate jump detected.',
+  [ERROR_CODES.LOCATION_UPDATE_FAILED]: 'Unable to update vehicle location.',
+
+  // System
+  [ERROR_CODES.MAINTENANCE_MODE]: 'Transportation booking is temporarily suspended for scheduled platform maintenance.',
+  [ERROR_CODES.DATABASE_UNAVAILABLE]: 'Database service is temporarily unavailable. Please try again in a moment.',
+  [ERROR_CODES.SERVER_ERROR]: 'Something went wrong. We couldn\'t complete your request right now. Please try again later.',
+  [ERROR_CODES.INTERNAL_ERROR]: 'An unexpected error occurred. Please try again later.',
+};

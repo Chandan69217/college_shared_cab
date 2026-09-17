@@ -2,15 +2,28 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentService = void 0;
 const paymentProvider_1 = require("../integrations/paymentProvider");
-const notificationProvider_1 = require("../integrations/notificationProvider");
+const notificationService_1 = require("./notificationService");
 const subscriptionRepository_1 = require("../repositories/subscriptionRepository");
 const paymentRepository_1 = require("../repositories/paymentRepository");
+const userRepository_1 = require("../repositories/userRepository");
+const settingsRepository_1 = require("../repositories/settingsRepository");
 const supabaseClient_1 = require("../database/supabaseClient");
 class PaymentService {
     /**
      * Initiate subscription purchase with real Supabase records
      */
     static async initiateSubscriptionPayment(studentId, planId, paymentMethod = 'UPI', autoRenew = false) {
+        // 1. Enforce student KYC verification check if enabled in admin settings
+        const requireKyc = await settingsRepository_1.SettingsRepository.get('requireAdminKycApproval', true);
+        if (requireKyc) {
+            const studentProfile = await userRepository_1.UserRepository.getStudentProfile(studentId);
+            if (!studentProfile || studentProfile.verification_status !== 'VERIFIED') {
+                const err = new Error('Student KYC is pending administrative approval. Subscription purchase is only allowed once your ID documents are verified.');
+                err.statusCode = 403;
+                err.code = 'KYC_REQUIRED';
+                throw err;
+            }
+        }
         const plan = await subscriptionRepository_1.PlanRepository.findById(planId);
         if (!plan) {
             const err = new Error('Subscription plan not found.');
@@ -112,7 +125,22 @@ class PaymentService {
             updated_at: now,
         })
             .eq('id', payment.subscription_id);
-        await notificationProvider_1.NotificationProvider.send(studentId, 'Subscription Activated!', `Payment of ₹${payment.amount} confirmed. Your pass is now active for daily rides.`, 'PAYMENT', { paymentId: payment.id, subscriptionId: payment.subscription_id });
+        try {
+            await notificationService_1.NotificationService.createNotification({
+                userId: studentId,
+                recipientRole: 'STUDENT',
+                title: 'Subscription Activated!',
+                message: `Payment of ₹${payment.amount} confirmed. Your pass is now active for daily rides.`,
+                type: 'SUBSCRIPTION_ACTIVATED',
+                entityType: 'PAYMENT',
+                entityId: payment.id,
+                priority: 'HIGH',
+                data: { paymentId: payment.id, subscriptionId: payment.subscription_id, amount: payment.amount },
+            });
+        }
+        catch (notifErr) {
+            // Non-blocking notification error
+        }
         return {
             success: true,
             message: 'Subscription purchased and activated successfully.',

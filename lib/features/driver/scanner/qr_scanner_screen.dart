@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 
 class QrScannerScreen extends StatefulWidget {
   final bool isActive;
@@ -197,12 +198,7 @@ class _QrScannerScreenState extends State<QrScannerScreen>
       await _fetchActiveTrip();
       if (_activeTripId == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No active scheduled trip found for your account.'),
-              backgroundColor: AppColors.accentAmber,
-            ),
-          );
+          AppFeedback.showWarning(context, 'No active scheduled trip found for your account.');
         }
         return;
       }

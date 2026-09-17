@@ -29,6 +29,7 @@ export function sendError(
     data: null,
     error: {
       code,
+      message,
       details,
     },
   };

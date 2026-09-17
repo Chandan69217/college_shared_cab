@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Plus, CheckCircle, AlertTriangle } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export const HolidaysPage: React.FC = () => {
+  const toast = useToast();
   const [holidays, setHolidays] = useState<any[]>([]);
   const [colleges, setColleges] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [formData, setFormData] = useState({
     college_id: '',
     holiday_date: '',
@@ -29,7 +32,7 @@ export const HolidaysPage: React.FC = () => {
         setColleges(cRes.data.data);
       }
     } catch (err) {
-      console.error(err);
+      toast.error(err);
     }
   };
 
@@ -50,15 +53,19 @@ export const HolidaysPage: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setActionLoading(true);
     try {
       await api.post('/holidays', {
         ...formData,
         college_id: formData.college_id || colleges[0]?.id,
       });
       setModalOpen(false);
+      toast.success(`Holiday "${formData.title}" scheduled successfully.`);
       fetchHolidays();
     } catch (err) {
-      console.error(err);
+      toast.error(err);
+    } finally {
+      setActionLoading(false);
     }
   };
 

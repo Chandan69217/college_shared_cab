@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 
 class PassengerManifestScreen extends StatefulWidget {
   const PassengerManifestScreen({super.key});
@@ -13,37 +14,30 @@ class _PassengerManifestScreenState extends State<PassengerManifestScreen> {
   List<dynamic> _passengers = [];
   bool _isLoading = true;
   String _filter = 'ALL'; // 'ALL', 'WAITING', 'BOARDED', 'NO_SHOW'
-  String? _tripName;
   String? _activeTripId;
+  String? _tripName;
   String? _updatingStudentId;
 
   Future<void> _fetchManifest() async {
+    setState(() => _isLoading = true);
     try {
-      final dashRes = await apiClient.get('/drivers/dashboard');
-      if (dashRes.data['success'] == true) {
-        final activeTrip = dashRes.data['data']?['activeTrip'];
-        if (activeTrip != null && activeTrip['id'] != null) {
-          final tripId = activeTrip['id'];
-          setState(() {
-            _activeTripId = tripId;
-            _tripName = activeTrip['route']?['name'] ?? 'Scheduled Route';
-          });
-          final res = await apiClient.get('/drivers/trips/$tripId/manifest');
-          if (res.data['success'] == true && mounted) {
+      final tripRes = await apiClient.get('/drivers/dashboard');
+      if (tripRes.data['success'] == true) {
+        final activeTrip = tripRes.data['data']?['activeTrip'];
+        if (activeTrip != null) {
+          _activeTripId = activeTrip['id'];
+          _tripName = activeTrip['route']?['name'] ?? activeTrip['route_name'] ?? activeTrip['name'];
+          final manifestRes = await apiClient.get('/drivers/trips/$_activeTripId/passengers');
+          if (manifestRes.data['success'] == true && mounted) {
             setState(() {
-              _passengers = res.data['data'] ?? [];
+              _passengers = manifestRes.data['data'] ?? [];
               _isLoading = false;
             });
             return;
           }
         }
       }
-      if (mounted) {
-        setState(() {
-          _passengers = [];
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -58,23 +52,12 @@ class _PassengerManifestScreenState extends State<PassengerManifestScreen> {
         data: {'status': status},
       );
       if (res.data['success'] == true && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Passenger status updated to $status'),
-            backgroundColor: status == 'BOARDED' ? AppColors.primary : AppColors.surfaceCard,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppFeedback.showSuccess(context, 'Passenger status updated to $status');
         await _fetchManifest();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _updatingStudentId = null);

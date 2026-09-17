@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController';
 import { CatalogController } from '../controllers/catalogController';
+import { SettingsController } from '../controllers/settingsController';
 import { authenticateJwt } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { auditLog } from '../middleware/auditLog';
+
+import { NotificationController } from '../controllers/notificationController';
 
 const router = Router();
 
@@ -12,6 +15,15 @@ router.use(requireRole(['ADMIN']));
 
 // Dashboard & Stats
 router.get('/dashboard-stats', AdminController.getDashboardStats);
+
+// Notification Center & Broadcast Announcements
+router.get('/notifications', NotificationController.getAdminNotifications);
+router.post('/notifications', auditLog('SEND_BROADCAST_NOTIFICATION', 'notifications'), NotificationController.broadcastAnnouncement);
+
+// System & Transportation Platform Settings
+router.get('/settings', SettingsController.getSettings);
+router.put('/settings', auditLog('UPDATE_SETTINGS', 'system_settings'), SettingsController.updateSettings);
+router.patch('/settings', auditLog('UPDATE_SETTINGS', 'system_settings'), SettingsController.updateSettings);
 
 // Student Management
 router.get('/students', AdminController.getStudents);

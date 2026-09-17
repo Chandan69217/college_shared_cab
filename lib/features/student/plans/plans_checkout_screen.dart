@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/plan_model.dart';
+import '../../../core/storage/storage_service.dart';
+import '../../../core/services/settings_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_feedback.dart';
 
 class PlansCheckoutScreen extends StatefulWidget {
   const PlansCheckoutScreen({super.key});
@@ -15,14 +18,56 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
   List<PlanModel> _plans = [];
   bool _isLoading = true;
   bool _isPurchasing = false;
+  String _verificationStatus = 'PENDING';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialKycStatus();
+    _fetchPlans();
+  }
+
+  void _loadInitialKycStatus() {
+    final userData = StorageService.getUserData();
+    if (userData != null) {
+      final profile = userData['profile'] as Map<String, dynamic>?;
+      if (profile != null && profile['verification_status'] != null) {
+        _verificationStatus = profile['verification_status'].toString().toUpperCase();
+      }
+    }
+  }
 
   Future<void> _fetchPlans() async {
     try {
-      final res = await apiClient.get('/plans');
-      if (res.data['success'] == true && mounted) {
-        final List list = res.data['data'] ?? [];
+      final results = await Future.wait([
+        apiClient.get('/plans').catchError((e) => e),
+        apiClient.get('/students/dashboard').catchError((e) => e),
+        SettingsService.instance.fetchSettings().catchError((e) => e),
+      ]);
+
+      final dynamic plansRes = results[0];
+      final dynamic dashRes = results[1];
+
+      List<PlanModel> loadedPlans = [];
+      String vStatus = _verificationStatus;
+
+      if (plansRes is! Exception && plansRes != null && plansRes.data != null && plansRes.data['success'] == true) {
+        final List list = plansRes.data['data'] ?? [];
+        loadedPlans = list.map((p) => PlanModel.fromJson(p)).toList();
+      }
+
+      if (dashRes is! Exception && dashRes != null && dashRes.data != null && dashRes.data['success'] == true) {
+        final data = dashRes.data['data'] ?? {};
+        final profile = data['profile'] as Map<String, dynamic>?;
+        if (profile != null && profile['verification_status'] != null) {
+          vStatus = profile['verification_status'].toString().toUpperCase();
+        }
+      }
+
+      if (mounted) {
         setState(() {
-          _plans = list.map((p) => PlanModel.fromJson(p)).toList();
+          _plans = loadedPlans;
+          _verificationStatus = vStatus;
           _isLoading = false;
         });
       }
@@ -31,13 +76,78 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchPlans();
+  void _showKycRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: AppColors.accentAmber, size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'KYC Approval Required',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your student verification status is currently: $_verificationStatus',
+              style: const TextStyle(color: AppColors.accentAmber, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'For security and campus policy, commuter passes can only be purchased once your student ID and college enrollment are verified by the campus transport administrator.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF374151)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: AppColors.primaryLight),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Please allow up to 24 hours for administrator review.',
+                      style: TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Understood'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handlePurchase(PlanModel plan) async {
+    final requireKyc = SettingsService.instance.requireAdminKycApproval;
+    // 0. Strict KYC verification check if enforced in settings
+    if (requireKyc && _verificationStatus != 'VERIFIED') {
+      _showKycRequiredDialog();
+      return;
+    }
+
     setState(() => _isPurchasing = true);
     try {
       // 1. Initiate subscription purchase
@@ -95,12 +205,7 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiClient.getErrorMessage(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        AppFeedback.showError(context, e);
       }
     } finally {
       if (mounted) setState(() => _isPurchasing = false);
@@ -109,6 +214,9 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final requireKyc = SettingsService.instance.requireAdminKycApproval;
+    final isKycEligible = !requireKyc || _verificationStatus == 'VERIFIED';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -121,6 +229,48 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // KYC Status Alert Banner if required and not verified
+                  if (!isKycEligible) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentAmber.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.accentAmber.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shield_outlined, color: AppColors.accentAmber, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Student KYC Approval Required',
+                                  style: TextStyle(
+                                    color: AppColors.accentAmber,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Your identity verification is currently $_verificationStatus. Commuter passes can only be purchased once approved by campus transport administration.',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   const Text(
                     'Select Your Commute Pass',
                     style: TextStyle(
@@ -230,9 +380,17 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
                           const SizedBox(height: 16),
 
                           ElevatedButton(
-                            onPressed: _isPurchasing ? null : () => _handlePurchase(plan),
+                            onPressed: _isPurchasing
+                                ? null
+                                : isKycEligible
+                                    ? () => _handlePurchase(plan)
+                                    : _showKycRequiredDialog,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isPremium ? AppColors.accentPurple : AppColors.primary,
+                              backgroundColor: !isKycEligible
+                                  ? const Color(0xFF374151)
+                                  : isPremium
+                                      ? AppColors.accentPurple
+                                      : AppColors.primary,
                               minimumSize: const Size.fromHeight(44),
                             ),
                             child: _isPurchasing
@@ -241,12 +399,20 @@ class _PlansCheckoutScreenState extends State<PlansCheckoutScreen> {
                                     width: 18,
                                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                   )
-                                : Text('Subscribe via UPI / Cards (₹${plan.price.toInt()})'),
+                                : Text(
+                                    isKycEligible
+                                        ? 'Subscribe via UPI / Cards (₹${plan.price.toInt()})'
+                                        : 'KYC Approval Required to Purchase',
+                                    style: TextStyle(
+                                      color: isKycEligible ? Colors.black : Colors.white70,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),

@@ -24,11 +24,14 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { Route, Vehicle, User, PickupPoint } from '../types';
 import { GOOGLE_MAPS_API_KEY, MAP_LIBRARIES, DARK_MAP_STYLE } from '../config/maps';
 
 export const RoutesPage: React.FC = () => {
+  const toast = useToast();
   const [routes, setRoutes] = useState<Route[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<User[]>([]);
@@ -43,7 +46,6 @@ export const RoutesPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
     college_id: '',
@@ -158,10 +160,10 @@ export const RoutesPage: React.FC = () => {
         stops: selectedStops,
       });
       setModalOpen(false);
-      setSuccessMessage(`Route ${formData.name} created successfully.`);
+      toast.success(`Route "${formData.name}" created successfully.`);
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -182,10 +184,10 @@ export const RoutesPage: React.FC = () => {
         stops: selectedStops,
       });
       setEditModalOpen(false);
-      setSuccessMessage(`Route ${formData.name} updated successfully.`);
+      toast.success(`Route "${formData.name}" updated successfully.`);
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -200,10 +202,10 @@ export const RoutesPage: React.FC = () => {
     try {
       await api.delete(`/admin/routes/${selectedRoute.id}`);
       setDeleteModalOpen(false);
-      setSuccessMessage(`Route ${selectedRoute.name} deleted successfully.`);
+      toast.success(`Route "${selectedRoute.name}" deleted successfully.`);
       fetchData();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -299,13 +301,6 @@ export const RoutesPage: React.FC = () => {
           <span>Create New Route</span>
         </button>
       </div>
-
-      {successMessage && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-          <span>{successMessage}</span>
-        </div>
-      )}
 
       {/* Filter Bar */}
       <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs">
@@ -869,41 +864,17 @@ export const RoutesPage: React.FC = () => {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Confirm Route Deletion">
-        <div className="space-y-4 text-xs">
-          {modalError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
-              {modalError}
-            </div>
-          )}
-
-          <p className="text-slate-300">
-            Are you sure you want to delete route <span className="font-bold text-white">{selectedRoute?.name}</span> (
-            <span className="font-mono text-emerald-400">{selectedRoute?.code}</span>)?
-          </p>
-
-          <p className="text-slate-400 text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
-            Note: Routes with active student bookings or scheduled trips cannot be deleted without reassigning those
-            dependencies. You can mark the route as Inactive instead.
-          </p>
-
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
-            <button
-              onClick={() => setDeleteModalOpen(false)}
-              className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={actionLoading}
-              className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold transition shadow-lg shadow-rose-600/20 disabled:opacity-50"
-            >
-              {actionLoading ? 'Deleting...' : 'Confirm Delete'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        title="Remove Route Corridor"
+        message={`Are you sure you want to delete route "${selectedRoute?.name}" (${selectedRoute?.code})? Routes with active student bookings or scheduled trips cannot be deleted without reassigning those dependencies.`}
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+      />
     </div>
   );
 };

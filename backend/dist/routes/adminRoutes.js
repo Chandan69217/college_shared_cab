@@ -3,14 +3,23 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const adminController_1 = require("../controllers/adminController");
 const catalogController_1 = require("../controllers/catalogController");
+const settingsController_1 = require("../controllers/settingsController");
 const auth_1 = require("../middleware/auth");
 const rbac_1 = require("../middleware/rbac");
 const auditLog_1 = require("../middleware/auditLog");
+const notificationController_1 = require("../controllers/notificationController");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticateJwt);
 router.use((0, rbac_1.requireRole)(['ADMIN']));
 // Dashboard & Stats
 router.get('/dashboard-stats', adminController_1.AdminController.getDashboardStats);
+// Notification Center & Broadcast Announcements
+router.get('/notifications', notificationController_1.NotificationController.getAdminNotifications);
+router.post('/notifications', (0, auditLog_1.auditLog)('SEND_BROADCAST_NOTIFICATION', 'notifications'), notificationController_1.NotificationController.broadcastAnnouncement);
+// System & Transportation Platform Settings
+router.get('/settings', settingsController_1.SettingsController.getSettings);
+router.put('/settings', (0, auditLog_1.auditLog)('UPDATE_SETTINGS', 'system_settings'), settingsController_1.SettingsController.updateSettings);
+router.patch('/settings', (0, auditLog_1.auditLog)('UPDATE_SETTINGS', 'system_settings'), settingsController_1.SettingsController.updateSettings);
 // Student Management
 router.get('/students', adminController_1.AdminController.getStudents);
 router.post('/students', (0, auditLog_1.auditLog)('CREATE_STUDENT', 'student_profiles'), adminController_1.AdminController.createStudent);

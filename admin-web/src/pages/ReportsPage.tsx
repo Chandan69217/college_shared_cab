@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart3, Download, TrendingUp, Users, Car, ShieldCheck, Loader2 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export const ReportsPage: React.FC = () => {
+  const toast = useToast();
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [exportingReport, setExportingReport] = useState<string | null>(null);
@@ -109,9 +111,10 @@ export const ReportsPage: React.FC = () => {
         ]);
         downloadCsv('driver_safety_scorecard', headers, rows);
       }
-    } catch (err) {
+      toast.showSuccess(`${reportType} CSV export generated and downloaded successfully.`);
+    } catch (err: any) {
       console.error('Export failed', err);
-      alert('Failed to generate export file. Please verify database connection.');
+      toast.showError(getApiErrorMessage(err));
     } finally {
       setExportingReport(null);
     }

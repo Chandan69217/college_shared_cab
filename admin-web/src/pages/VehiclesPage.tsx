@@ -12,10 +12,13 @@ import {
 } from 'lucide-react';
 import { DataTable, Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { api, getApiErrorMessage } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import { Vehicle } from '../types';
 
 export const VehiclesPage: React.FC = () => {
+  const toast = useToast();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [colleges, setColleges] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -28,7 +31,6 @@ export const VehiclesPage: React.FC = () => {
 
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
     college_id: '',
@@ -109,10 +111,10 @@ export const VehiclesPage: React.FC = () => {
     try {
       await api.post('/catalog/vehicles', formData);
       setModalOpen(false);
-      setSuccessMessage(`Vehicle ${formData.vehicle_number} registered successfully.`);
+      toast.success(`Vehicle "${formData.vehicle_number}" registered successfully.`);
       fetchVehicles();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -128,10 +130,10 @@ export const VehiclesPage: React.FC = () => {
     try {
       await api.put(`/admin/vehicles/${selectedVehicle.id}`, formData);
       setEditModalOpen(false);
-      setSuccessMessage(`Vehicle ${formData.vehicle_number} updated successfully.`);
+      toast.success(`Vehicle "${formData.vehicle_number}" updated successfully.`);
       fetchVehicles();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -146,10 +148,10 @@ export const VehiclesPage: React.FC = () => {
     try {
       await api.delete(`/admin/vehicles/${selectedVehicle.id}`);
       setDeleteModalOpen(false);
-      setSuccessMessage(`Vehicle ${selectedVehicle.vehicle_number} removed from fleet.`);
+      toast.success(`Vehicle "${selectedVehicle.vehicle_number}" removed from fleet.`);
       fetchVehicles();
-      setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
+      toast.error(err);
       setModalError(getApiErrorMessage(err));
     } finally {
       setActionLoading(false);
@@ -240,13 +242,6 @@ export const VehiclesPage: React.FC = () => {
           <span>Register Vehicle</span>
         </button>
       </div>
-
-      {successMessage && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-          <span>{successMessage}</span>
-        </div>
-      )}
 
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3 bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs">
@@ -544,42 +539,17 @@ export const VehiclesPage: React.FC = () => {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Confirm Vehicle Deletion">
-        <div className="space-y-4 text-xs">
-          {modalError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
-              {modalError}
-            </div>
-          )}
-
-          <p className="text-slate-300">
-            Are you sure you want to delete vehicle{' '}
-            <span className="font-mono font-bold text-white">{selectedVehicle?.vehicle_number}</span> (
-            {selectedVehicle?.model}) from the fleet?
-          </p>
-
-          <p className="text-slate-400 text-[11px] bg-slate-950 p-3 rounded-lg border border-slate-800">
-            Note: The system will verify if this vehicle is currently assigned as default for active routes or scheduled
-            trips before allowing deletion.
-          </p>
-
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
-            <button
-              onClick={() => setDeleteModalOpen(false)}
-              className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={actionLoading}
-              className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold transition shadow-lg shadow-rose-600/20 disabled:opacity-50"
-            >
-              {actionLoading ? 'Deleting...' : 'Confirm Delete'}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+        title="Remove Vehicle from Fleet"
+        message={`Are you sure you want to delete vehicle "${selectedVehicle?.vehicle_number}" (${selectedVehicle?.model}) from the fleet? Active route or trip assignments must be unassigned first.`}
+        confirmText="Confirm Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={actionLoading}
+      />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminService = void 0;
-const notificationProvider_1 = require("../integrations/notificationProvider");
+const notificationService_1 = require("./notificationService");
 const crypto_1 = require("../utils/crypto");
 const userRepository_1 = require("../repositories/userRepository");
 const reportRepository_1 = require("../repositories/reportRepository");
@@ -27,9 +27,24 @@ class AdminService {
             verified_at: new Date().toISOString(),
             verified_by: adminId,
         });
-        await notificationProvider_1.NotificationProvider.send(studentId, status === 'VERIFIED' ? 'Student Verification Approved!' : 'Verification Status Update', status === 'VERIFIED'
-            ? 'Your student profile has been verified. You can now book daily cabs.'
-            : `Your verification status has been updated to ${status}. Notes: ${notes || 'None'}`, 'GENERAL');
+        try {
+            await notificationService_1.NotificationService.createNotification({
+                userId: studentId,
+                recipientRole: 'STUDENT',
+                title: status === 'VERIFIED' ? 'Student Verification Approved!' : 'Verification Status Update',
+                message: status === 'VERIFIED'
+                    ? 'Your student profile has been verified. You can now book daily cabs.'
+                    : `Your verification status has been updated to ${status}. Notes: ${notes || 'None'}`,
+                type: status === 'VERIFIED' ? 'ACCOUNT_VERIFIED' : 'ACCOUNT_REJECTED',
+                entityType: 'KYC',
+                entityId: studentId,
+                priority: status === 'VERIFIED' ? 'HIGH' : 'NORMAL',
+                data: { status, notes },
+            });
+        }
+        catch (notifErr) {
+            // Non-blocking notification error
+        }
         return profile;
     }
     /**
